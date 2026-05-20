@@ -6,23 +6,27 @@ class GameEngine {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d', { alpha: false });
+        
         this.spawner = new EnemySpawner(window.innerWidth, window.innerHeight);
         this.upgrades = new UpgradeManager();
+        
         this.isRunning = false;
         this.isPaused = false;
         this.lastTime = 0;
         this.startTime = 0;
         this.shakeAmount = 0;
         this.score = 0;
+        
         this.level = 1;
         this.xp = 0;
         this.xpToNextLevel = 20;
-        this.currentChoices = [];
+        this.currentChoices = []; 
+        this.currentMode = 'standard'; 
+        
         this.mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2, isDown: false };
         this.isTouch = false;
         
         this.Enemy = Enemy;
-        
         this.init();
     }
     
@@ -33,12 +37,14 @@ class GameEngine {
             this.spawner.width = this.canvas.width;
             this.spawner.height = this.canvas.height;
         });
+        
         window.addEventListener('mousemove', (e) => {
             this.mouse.x = e.clientX;
             this.mouse.y = e.clientY;
         });
         window.addEventListener('mousedown', () => this.mouse.isDown = true);
         window.addEventListener('mouseup', () => this.mouse.isDown = false);
+
         window.addEventListener('touchstart', (e) => {
             this.isTouch = true;
             this.mouse.x = e.touches[0].clientX;
@@ -48,11 +54,10 @@ class GameEngine {
         window.addEventListener('touchmove', (e) => {
             this.mouse.x = e.touches[0].clientX;
             this.mouse.y = e.touches[0].clientY;
-            e.preventDefault();
+            e.preventDefault(); 
         }, { passive: false });
-        window.addEventListener('touchend', () => {
-            this.mouse.isDown = false;
-        });
+        window.addEventListener('touchend', () => { this.mouse.isDown = false; });
+
         window.addEventListener('keydown', (e) => {
             if (this.isPaused && !document.getElementById('upgradeScreen').classList.contains('hidden')) {
                 if (e.key === '1' && this.currentChoices.length >= 1) this.selectUpgrade(0);
@@ -61,31 +66,59 @@ class GameEngine {
             }
         });
         
-        document.getElementById('startBtn').addEventListener('click', () => this.start());
-        document.getElementById('restartBtn').addEventListener('click', () => this.start());
+        document.getElementById('btnStandard').addEventListener('click', () => this.start('standard'));
+        document.getElementById('btnHardcore').addEventListener('click', () => this.start('hardcore'));
+        document.getElementById('restartBtn').addEventListener('click', () => this.start(this.currentMode));
+        document.getElementById('homeBtn').addEventListener('click', () => this.goHome());
     }
     
     resize() {
         this.canvas.width = window.innerWidth;
         this.canvas.height = window.innerHeight;
     }
-    start() {
+
+    goHome() {
+        document.getElementById('gameOverScreen').classList.add('hidden');
+        document.getElementById('hud').classList.add('hidden');
+        document.getElementById('mainMenu').classList.remove('hidden');
+        
+        this.ctx.fillStyle = '#0f172a';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+    
+    start(mode = 'standard') {
+        this.currentMode = mode;
+
         document.getElementById('mainMenu').classList.add('hidden');
         document.getElementById('gameOverScreen').classList.add('hidden');
+        document.getElementById('upgradeScreen').classList.add('hidden'); 
         document.getElementById('hud').classList.remove('hidden');
+        
         this.player = new Player(this.canvas.width / 2, this.canvas.height / 2);
+        
+        if (mode === 'hardcore') {
+            this.player.health = 1;
+            this.player.maxHealth = 1;
+            this.spawner.baseSpawnRate = 600; 
+        } else {
+            this.spawner.baseSpawnRate = 1000; 
+        }
+
         this.mouse.x = this.canvas.width / 2;
         this.mouse.y = this.canvas.height / 2;
+
         this.projectiles = [];
         this.particles = [];
         this.enemies = [];
         this.gems = [];
-        this.floatingTexts = [];  
+        this.floatingTexts = [];
+        
         this.score = 0;
         this.level = 1;
         this.xp = 0;
         this.xpToNextLevel = 20;
-        this.updateHUD();   
+        this.updateHUD();
+        
         this.isRunning = true;
         this.isPaused = false;
         this.startTime = performance.now();
@@ -110,6 +143,8 @@ class GameEngine {
     }
 
     damagePlayer(amount) {
+        if (!this.isRunning) return; 
+
         this.player.health -= amount;
         this.triggerShake(10);
         
@@ -125,6 +160,10 @@ class GameEngine {
     }
 
     gainXP(amount) {
+        if (!this.isRunning) return; 
+
+        if (this.currentMode === 'hardcore') amount *= 2;
+
         this.xp += amount;
         if (this.xp >= this.xpToNextLevel) {
             this.xp -= this.xpToNextLevel;
@@ -134,6 +173,8 @@ class GameEngine {
     }
 
     levelUp() {
+        if (!this.isRunning) return; 
+
         this.level++;
         this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.5);
         document.getElementById('levelDisplay').innerText = this.level;
@@ -167,6 +208,7 @@ class GameEngine {
         this.upgrades.applyUpgrade(choice.id, this.player);
         document.getElementById('upgradeScreen').classList.add('hidden');
         this.isPaused = false;
+        
         this.mouse.x = this.player.x;
         this.mouse.y = this.player.y;
 
@@ -215,8 +257,10 @@ class GameEngine {
         document.getElementById('timeDisplay').innerText = `${mins}:${secs}`;
 
         this.spawner.update(dt, timeAliveMS, this);
+        
         const shouldStopToShoot = this.mouse.isDown && !this.isTouch;
         this.player.update(this.mouse.x, this.mouse.y, dt, shouldStopToShoot);
+        
         if (this.mouse.isDown && currentTime - this.player.lastShotTime > this.player.stats.fireRate) {
             const spread = 0.15;
             const startAngle = this.player.angle - (spread * (this.player.stats.multiShot - 1)) / 2;
