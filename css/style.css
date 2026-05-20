@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&display=swap');
+
+body {
+    font-family: 'Rajdhani', sans-serif;
+    cursor: crosshair;
+}
+
+.glass-panel {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+
+@keyframes pulse-glow {
+    0%, 100% { box-shadow: 0 0 15px rgba(6, 182, 212, 0.4); }
+    50% { box-shadow: 0 0 25px rgba(6, 182, 212, 0.8); }
+}
+
+.upgrade-card {
+    background: rgba(30, 41, 59, 0.8);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.upgrade-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(6, 182, 212, 1);
+    box-shadow: 0 10px 30px rgba(6, 182, 212, 0.3);
+}
