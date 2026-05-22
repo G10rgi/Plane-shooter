@@ -33,6 +33,7 @@ export class EnemySpawner {
         const rand = Math.random();
         
         const activeShooters = game.enemies.filter(e => e.type === 'shooter').length;
+        const activeShields = game.enemies.filter(e => e.type === 'shield').length;
 
         if (timeMS < 120000) {
             if (rand < 0.20) type = 'fast';
@@ -41,7 +42,7 @@ export class EnemySpawner {
         } 
         else if (timeMS < 240000) {
             if (rand < 0.15 && activeShooters < 3) type = 'shooter'; 
-            else if (rand < 0.35) type = 'shield';
+            else if (rand < 0.35 && activeShields < 5) type = 'shield';
             else if (rand < 0.55) type = 'heavy';
             else if (rand < 0.75) type = 'fast';
             else type = 'basic';
@@ -49,7 +50,7 @@ export class EnemySpawner {
         else {
             if (rand < 0.20) type = 'elite';
             else if (rand < 0.40 && activeShooters < 5) type = 'shooter'; 
-            else if (rand < 0.60) type = 'shield';
+            else if (rand < 0.60 && activeShields < 5) type = 'shield';
             else if (rand < 0.80) type = 'heavy';
             else type = 'fast'; 
         }

@@ -1,4 +1,3 @@
-// js/entities.js
 import { MathUtils, CONFIG } from './math.js';
 
 export class Particle {
@@ -111,7 +110,6 @@ export class Enemy {
         this.x = x; this.y = y; this.type = type;
         this.markedForDeletion = false; this.hitFlashTimer = 0;
         
-        // Sync with gameTime passed from spawner
         this.lastShotTime = spawnTime + Math.random() * 2000; 
         this.fireRate = 3500; 
         this.isCharging = false;
@@ -119,7 +117,13 @@ export class Enemy {
         this.chargeStartTime = 0;
 
         switch(type) {
-            case 'fast': this.radius = 8; this.speed = 3.2; this.health = 15; this.color = '#ffffff'; this.xpValue = 2; break;
+            case 'fast': 
+                this.radius = 10;
+                this.speed = 3.2; 
+                this.health = 15; 
+                this.color = '#f97316';
+                this.xpValue = 2; 
+                break;
             case 'shield': this.radius = 16; this.speed = 1.0; this.health = 60; this.color = '#2dd4bf'; this.xpValue = 20; break;
             case 'heavy': this.radius = 20; this.speed = 0.5; this.health = 80; this.color = '#8b5cf6'; this.xpValue = 10; break;
             case 'elite': this.radius = 16; this.speed = 1.6; this.health = 120; this.color = '#eab308'; this.xpValue = 30; break;

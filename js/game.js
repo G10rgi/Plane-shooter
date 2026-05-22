@@ -1,4 +1,3 @@
-// js/game.js
 import { MathUtils, CONFIG } from './math.js';
 import { Player, Projectile, Particle, Enemy, XPGem, FloatingText } from './entities.js';
 import { EnemySpawner, UpgradeManager } from './systems.js';
@@ -144,7 +143,6 @@ class GameEngine {
                 this.isCountingDown = false;
                 this.isPaused = false;
                 
-                // SYNCHRONIZATION FIX: Reset lastTime to the exact frame time so dt = 0 on resume
                 requestAnimationFrame((time) => {
                     this.lastTime = time;
                     this.loop(time);
@@ -201,7 +199,6 @@ class GameEngine {
         this.gameTime = 0; 
         this.slowMoTimer = 0; 
 
-        // SYNCHRONIZATION FIX: Initialize loop perfectly with browser frame clock
         requestAnimationFrame((time) => {
             this.lastTime = time;
             this.loop(time);
@@ -296,7 +293,6 @@ class GameEngine {
         this.mouse.y = this.player.y;
         this.slowMoTimer = 3000; 
 
-        // SYNCHRONIZATION FIX: Reset loop cleanly upon selecting upgrade
         requestAnimationFrame((time) => {
             this.lastTime = time;
             this.loop(time);
@@ -324,10 +320,8 @@ class GameEngine {
     }
     
     loop(currentTime) {
-        // If the game is paused, we simply return and the loop halts
         if (!this.isRunning || this.isPaused || this.isCountingDown) return;
         
-        // This is safe because on unpause we explicitly reset lastTime
         const dt = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
         
@@ -344,7 +338,6 @@ class GameEngine {
             gameDt = dt * 0.15; 
         }
 
-        // The master clock that ignores pausing completely
         this.gameTime += gameDt * 1000;
         
         const seconds = Math.floor(this.gameTime / 1000);
@@ -357,11 +350,11 @@ class GameEngine {
         const shouldStopToShoot = this.mouse.isDown && !this.isTouch;
         this.player.update(this.mouse.x, this.mouse.y, dt, shouldStopToShoot);
         
-        // SYNCHRONIZATION FIX: Player shooting tied strictly to the internal gameTime
         if (this.mouse.isDown && this.gameTime - this.player.lastShotTime > this.player.stats.fireRate) {
             const spread = 0.15;
             const startAngle = this.player.angle - (spread * (this.player.stats.multiShot - 1)) / 2;
-            
+            const currentProjSpeed = this.slowMoTimer > 0 ? CONFIG.PROJECTILE_SPEED * 1.8 : CONFIG.PROJECTILE_SPEED;
+
             for(let i = 0; i < this.player.stats.multiShot; i++) {
                 const angle = startAngle + (i * spread);
                 const tipX = this.player.x + Math.cos(this.player.angle) * 15;
@@ -372,7 +365,7 @@ class GameEngine {
                 const bulletColor = isCrit ? '#a855f7' : CONFIG.COLORS.projectile;
 
                 this.projectiles.push(new Projectile(
-                    tipX, tipY, angle, CONFIG.PROJECTILE_SPEED, finalDamage, bulletColor, false
+                    tipX, tipY, angle, currentProjSpeed, finalDamage, bulletColor, false
                 ));
                 this.projectiles[this.projectiles.length - 1].isCrit = isCrit;
             }
