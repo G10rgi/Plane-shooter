@@ -1,3 +1,5 @@
+// js/systems.js
+
 export class EnemySpawner {
     constructor(canvasWidth, canvasHeight) {
         this.width = canvasWidth;
@@ -7,6 +9,7 @@ export class EnemySpawner {
 
     update(dt, survivalTimeMS, game) {
         this.spawnTimer += dt * 1000;
+
         const pulseRate = survivalTimeMS > 180000 ? 1800 : 2500;
         const squadSize = survivalTimeMS > 180000 ? 4 : 3;
 
@@ -35,27 +38,26 @@ export class EnemySpawner {
 
         if (timeMS < 120000) {
             if (rand < 0.20) type = 'fast';
-            else if (rand < 0.30 && timeMS > 60000) type = 'heavy';
+            else if (rand < 0.30 && timeMS > 60000) type = 'heavy'; 
             else type = 'basic';
         } 
-
         else if (timeMS < 240000) {
-            if (rand < 0.15 && activeShooters < 3) type = 'shooter';
+            if (rand < 0.15 && activeShooters < 3) type = 'shooter'; 
             else if (rand < 0.35) type = 'shield';
             else if (rand < 0.55) type = 'heavy';
             else if (rand < 0.75) type = 'fast';
             else type = 'basic';
         } 
-
         else {
             if (rand < 0.20) type = 'elite';
-            else if (rand < 0.40 && activeShooters < 5) type = 'shooter';
+            else if (rand < 0.40 && activeShooters < 5) type = 'shooter'; 
             else if (rand < 0.60) type = 'shield';
             else if (rand < 0.80) type = 'heavy';
             else type = 'fast'; 
         }
 
-        game.enemies.push(new game.Enemy(x, y, type));
+        // Pass timeMS into constructor to sync internal clocks
+        game.enemies.push(new game.Enemy(x, y, type, timeMS));
     }
 }
 

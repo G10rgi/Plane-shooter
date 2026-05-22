@@ -1,3 +1,4 @@
+// js/game.js
 import { MathUtils, CONFIG } from './math.js';
 import { Player, Projectile, Particle, Enemy, XPGem, FloatingText } from './entities.js';
 import { EnemySpawner, UpgradeManager } from './systems.js';
@@ -15,7 +16,9 @@ class GameEngine {
         this.isCountingDown = false;
         
         this.lastTime = 0;
-        this.startTime = 0;
+        this.gameTime = 0; 
+        this.slowMoTimer = 0; 
+        
         this.shakeAmount = 0;
         this.score = 0;
         
@@ -24,6 +27,7 @@ class GameEngine {
         this.xpToNextLevel = 20;
         this.currentChoices = []; 
         this.currentMode = 'standard'; 
+        this.currentSkin = 0; 
         
         this.mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2, isDown: false };
         this.isTouch = false;
@@ -46,15 +50,16 @@ class GameEngine {
         });
         window.addEventListener('mousedown', () => this.mouse.isDown = true);
         window.addEventListener('mouseup', () => this.mouse.isDown = false);
+
         window.addEventListener('touchstart', (e) => {
             this.isTouch = true;
             this.mouse.x = e.touches[0].clientX;
-            this.mouse.y = e.touches[0].clientY - 100;
+            this.mouse.y = e.touches[0].clientY - 100; 
             this.mouse.isDown = true;
         }, { passive: false });
         window.addEventListener('touchmove', (e) => {
             this.mouse.x = e.touches[0].clientX;
-            this.mouse.y = e.touches[0].clientY - 100;
+            this.mouse.y = e.touches[0].clientY - 100; 
             e.preventDefault(); 
         }, { passive: false });
         window.addEventListener('touchend', () => { this.mouse.isDown = false; });
@@ -80,6 +85,23 @@ class GameEngine {
         document.getElementById('hudPauseBtn').addEventListener('click', () => this.togglePause());
         document.getElementById('resumeBtn').addEventListener('click', () => this.resumeWithCountdown());
         document.getElementById('pauseHomeBtn').addEventListener('click', () => this.goHome());
+
+        const skinButtons = document.querySelectorAll('.skin-btn');
+        skinButtons.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                skinButtons.forEach(b => {
+                    b.classList.remove(b.dataset.color);
+                    b.classList.add('border-transparent');
+                    b.classList.remove('shadow-[0_0_15px_rgba(6,182,212,0.6)]'); 
+                });
+                
+                const clicked = e.currentTarget;
+                clicked.classList.remove('border-transparent');
+                clicked.classList.add(clicked.dataset.color);
+                
+                this.currentSkin = parseInt(clicked.dataset.skin);
+            });
+        });
     }
     
     resize() {
@@ -98,7 +120,6 @@ class GameEngine {
 
     resumeWithCountdown() {
         document.getElementById('pauseScreen').classList.add('hidden');
-        document.getElementById('upgradeScreen').classList.add('hidden');
         
         this.isCountingDown = true;
         const cdScreen = document.getElementById('countdownScreen');
@@ -122,8 +143,12 @@ class GameEngine {
                 cdScreen.classList.add('hidden');
                 this.isCountingDown = false;
                 this.isPaused = false;
-                this.lastTime = performance.now(); 
-                requestAnimationFrame((time) => this.loop(time));
+                
+                // SYNCHRONIZATION FIX: Reset lastTime to the exact frame time so dt = 0 on resume
+                requestAnimationFrame((time) => {
+                    this.lastTime = time;
+                    this.loop(time);
+                });
             }
         }, 800); 
     }
@@ -148,7 +173,7 @@ class GameEngine {
         document.getElementById('pauseScreen').classList.add('hidden'); 
         document.getElementById('hud').classList.remove('hidden');
         
-        this.player = new Player(this.canvas.width / 2, this.canvas.height / 2);
+        this.player = new Player(this.canvas.width / 2, this.canvas.height / 2, this.currentSkin);
         
         if (mode === 'hardcore') {
             this.player.health = 1;
@@ -173,9 +198,14 @@ class GameEngine {
         this.isRunning = true;
         this.isPaused = false;
         this.isCountingDown = false;
-        this.startTime = performance.now();
-        this.lastTime = performance.now();
-        requestAnimationFrame((time) => this.loop(time));
+        this.gameTime = 0; 
+        this.slowMoTimer = 0; 
+
+        // SYNCHRONIZATION FIX: Initialize loop perfectly with browser frame clock
+        requestAnimationFrame((time) => {
+            this.lastTime = time;
+            this.loop(time);
+        });
     }
 
     triggerShake(amount) {
@@ -258,7 +288,19 @@ class GameEngine {
         if (!choice) return;
 
         this.upgrades.applyUpgrade(choice.id, this.player);
-        this.resumeWithCountdown(); 
+        
+        document.getElementById('upgradeScreen').classList.add('hidden');
+        this.isPaused = false;
+        
+        this.mouse.x = this.player.x;
+        this.mouse.y = this.player.y;
+        this.slowMoTimer = 3000; 
+
+        // SYNCHRONIZATION FIX: Reset loop cleanly upon selecting upgrade
+        requestAnimationFrame((time) => {
+            this.lastTime = time;
+            this.loop(time);
+        });
     }
 
     updateHUD() {
@@ -273,7 +315,7 @@ class GameEngine {
         document.getElementById('hud').classList.add('hidden');
         document.getElementById('gameOverScreen').classList.remove('hidden');
         
-        const timeAlive = Math.floor((performance.now() - this.startTime) / 1000);
+        const timeAlive = Math.floor(this.gameTime / 1000);
         const mins = String(Math.floor(timeAlive / 60)).padStart(2, '0');
         const secs = String(timeAlive % 60).padStart(2, '0');
         
@@ -282,31 +324,41 @@ class GameEngine {
     }
     
     loop(currentTime) {
+        // If the game is paused, we simply return and the loop halts
         if (!this.isRunning || this.isPaused || this.isCountingDown) return;
         
+        // This is safe because on unpause we explicitly reset lastTime
         const dt = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
         
-        this.update(dt, currentTime);
+        this.update(dt);
         this.draw();
         
         requestAnimationFrame((time) => this.loop(time));
     }
     
-    update(dt, currentTime) {
-        const timeAliveMS = currentTime - this.startTime;
+    update(dt) {
+        let gameDt = dt;
+        if (this.slowMoTimer > 0) {
+            this.slowMoTimer -= dt * 1000;
+            gameDt = dt * 0.15; 
+        }
+
+        // The master clock that ignores pausing completely
+        this.gameTime += gameDt * 1000;
         
-        const seconds = Math.floor(timeAliveMS / 1000);
+        const seconds = Math.floor(this.gameTime / 1000);
         const mins = String(Math.floor(seconds / 60)).padStart(2, '0');
         const secs = String(seconds % 60).padStart(2, '0');
         document.getElementById('timeDisplay').innerText = `${mins}:${secs}`;
 
-        this.spawner.update(dt, timeAliveMS, this);
+        this.spawner.update(gameDt, this.gameTime, this);
         
         const shouldStopToShoot = this.mouse.isDown && !this.isTouch;
         this.player.update(this.mouse.x, this.mouse.y, dt, shouldStopToShoot);
         
-        if (this.mouse.isDown && currentTime - this.player.lastShotTime > this.player.stats.fireRate) {
+        // SYNCHRONIZATION FIX: Player shooting tied strictly to the internal gameTime
+        if (this.mouse.isDown && this.gameTime - this.player.lastShotTime > this.player.stats.fireRate) {
             const spread = 0.15;
             const startAngle = this.player.angle - (spread * (this.player.stats.multiShot - 1)) / 2;
             
@@ -324,13 +376,14 @@ class GameEngine {
                 ));
                 this.projectiles[this.projectiles.length - 1].isCrit = isCrit;
             }
-            this.player.lastShotTime = currentTime;
+            this.player.lastShotTime = this.gameTime;
             this.triggerShake(1.5);
         }
 
         for (let i = this.projectiles.length - 1; i >= 0; i--) {
             const p = this.projectiles[i];
-            p.update(dt);
+            
+            p.update(p.isEnemy ? gameDt : dt);
             
             if (p.x < 0 || p.x > this.canvas.width || p.y < 0 || p.y > this.canvas.height || p.markedForDeletion) {
                 this.projectiles.splice(i, 1);
@@ -379,26 +432,27 @@ class GameEngine {
 
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
-            e.update(this.player.x, this.player.y, dt, this.enemies);
-        
+            
+            e.update(this.player.x, this.player.y, gameDt, this.enemies);
+            
             if (e.type === 'shooter') {
-                if (!e.isCharging && currentTime - e.lastShotTime > e.fireRate) {
+                if (!e.isCharging && this.gameTime - e.lastShotTime > e.fireRate) {
                     if (activeEnemyBullets < 30) {
                         e.isCharging = true;
                         e.chargeProgress = 0;
-                        e.chargeStartTime = currentTime;
+                        e.chargeStartTime = this.gameTime;
                         e.fireRate = 3000 + Math.random() * 1000; 
                     }
                 }
 
                 if (e.isCharging) {
-                    let chargeTime = currentTime - e.chargeStartTime;
-                    e.chargeProgress = Math.min(1, chargeTime / 1000);
+                    let chargeTime = this.gameTime - e.chargeStartTime;
+                    e.chargeProgress = Math.min(1, chargeTime / 1000); 
                     
-                    if (chargeTime >= 1000) {
+                    if (chargeTime >= 1000) { 
                         const angleToPlayer = MathUtils.angle(e.x, e.y, this.player.x, this.player.y);
                         this.projectiles.push(new Projectile(e.x, e.y, angleToPlayer, 3.5, 15, '#ef4444', true));
-                        e.lastShotTime = currentTime;
+                        e.lastShotTime = this.gameTime;
                         e.isCharging = false;
                         e.chargeProgress = 0;
                     }
@@ -423,7 +477,7 @@ class GameEngine {
 
         for (let i = this.gems.length - 1; i >= 0; i--) {
             const g = this.gems[i];
-            g.update(this.player.x, this.player.y, dt);
+            g.update(this.player.x, this.player.y, gameDt); 
             
             if (MathUtils.distance(g.x, g.y, this.player.x, this.player.y) < g.radius + this.player.radius) {
                 this.gainXP(g.value);
@@ -433,12 +487,12 @@ class GameEngine {
         }
 
         this.floatingTexts = this.floatingTexts.filter(t => {
-            t.update(dt);
+            t.update(gameDt); 
             return t.alpha > 0;
         });
 
         this.particles = this.particles.filter(p => {
-            p.update(dt);
+            p.update(gameDt); 
             return p.alpha > 0;
         });
         
@@ -465,6 +519,16 @@ class GameEngine {
         this.projectiles.forEach(p => p.draw(this.ctx));
         this.player.draw(this.ctx);
         this.floatingTexts.forEach(t => t.draw(this.ctx));
+        
+        if (this.slowMoTimer > 0) {
+            this.ctx.fillStyle = 'rgba(6, 182, 212, 0.05)';
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            
+            this.ctx.font = 'bold 20px Rajdhani';
+            this.ctx.fillStyle = `rgba(6, 182, 212, ${Math.min(1, this.slowMoTimer / 1000)})`;
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText("TACTICAL OVERDRIVE", this.player.x, this.player.y + 45);
+        }
         
         this.ctx.restore();
     }

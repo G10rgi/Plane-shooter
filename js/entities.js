@@ -1,3 +1,4 @@
+// js/entities.js
 import { MathUtils, CONFIG } from './math.js';
 
 export class Particle {
@@ -45,11 +46,17 @@ export class Projectile {
 }
 
 export class Player {
-    constructor(x, y) {
-        this.x = x; this.y = y; this.radius = CONFIG.PLAYER_RADIUS; this.angle = 0;
+    constructor(x, y, skinId = 0) {
+        this.x = x; this.y = y; 
+        this.radius = 18; 
+        this.angle = 0;
         this.health = CONFIG.PLAYER_MAX_HEALTH; this.maxHealth = CONFIG.PLAYER_MAX_HEALTH;
         this.stats = { fireRate: CONFIG.BASE_FIRE_RATE, damage: CONFIG.BASE_DAMAGE, multiShot: 1, speedScale: 1, critChance: 0 };
         this.lastShotTime = 0;
+        
+        this.skinId = skinId;
+        const skinColors = ['#06b6d4', '#3b82f6', '#ef4444', '#f97316', '#a855f7']; 
+        this.color = skinColors[skinId] || skinColors[0];
     }
     update(targetX, targetY, dt, isShooting = false) {
         if (!isShooting) {
@@ -60,18 +67,52 @@ export class Player {
     }
     draw(ctx) {
         ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
-        ctx.shadowBlur = 20; ctx.shadowColor = CONFIG.COLORS.playerGlow; ctx.fillStyle = CONFIG.COLORS.player;
-        ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(-10, 10); ctx.lineTo(-5, 0); ctx.lineTo(-10, -10); ctx.closePath(); ctx.fill();
+        
+        ctx.shadowBlur = 20; 
+        ctx.shadowColor = this.color; 
+        ctx.fillStyle = this.color;
+        
+        ctx.beginPath();
+        switch(this.skinId) {
+            case 0: 
+                ctx.moveTo(22, 0); ctx.lineTo(-15, 18); ctx.lineTo(-5, 0); ctx.lineTo(-15, -18); 
+                break;
+            case 1: 
+                ctx.moveTo(24, 0); ctx.lineTo(6, 8); ctx.lineTo(-10, 22); ctx.lineTo(-16, 10); 
+                ctx.lineTo(-22, 12); ctx.lineTo(-22, -12); ctx.lineTo(-16, -10); ctx.lineTo(-10, -22); 
+                ctx.lineTo(6, -8); 
+                break;
+            case 2: 
+                ctx.moveTo(26, 0); ctx.lineTo(10, 4); ctx.lineTo(-12, 26); ctx.lineTo(-18, 26); 
+                ctx.lineTo(-14, 5); ctx.lineTo(-24, 8); ctx.lineTo(-24, -8); ctx.lineTo(-14, -5); 
+                ctx.lineTo(-18, -26); ctx.lineTo(-12, -26); ctx.lineTo(10, -4); 
+                break;
+            case 3: 
+                ctx.moveTo(24, 0); ctx.lineTo(12, 5); ctx.lineTo(-2, 24); ctx.lineTo(-14, 24); 
+                ctx.lineTo(-14, 6); ctx.lineTo(-24, 10); ctx.lineTo(-24, -10); ctx.lineTo(-14, -6); 
+                ctx.lineTo(-14, -24); ctx.lineTo(-2, -24); ctx.lineTo(12, -5); 
+                break;
+            case 4: 
+                ctx.moveTo(30, 0); ctx.lineTo(5, 5); ctx.lineTo(-5, 18); ctx.lineTo(-12, 18); 
+                ctx.lineTo(-8, 6); ctx.lineTo(-24, 6); ctx.lineTo(-24, -6); ctx.lineTo(-8, -6); 
+                ctx.lineTo(-12, -18); ctx.lineTo(-5, -18); ctx.lineTo(5, -5); 
+                break;
+        }
+        ctx.closePath(); 
+        ctx.fill();
+        
         ctx.fillStyle = '#fff'; ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
     }
 }
 
 export class Enemy {
-    constructor(x, y, type = 'basic') {
+    constructor(x, y, type = 'basic', spawnTime = 0) {
         this.x = x; this.y = y; this.type = type;
         this.markedForDeletion = false; this.hitFlashTimer = 0;
-        this.lastShotTime = performance.now() + Math.random() * 2000;
+        
+        // Sync with gameTime passed from spawner
+        this.lastShotTime = spawnTime + Math.random() * 2000; 
         this.fireRate = 3500; 
         this.isCharging = false;
         this.chargeProgress = 0;
@@ -114,7 +155,7 @@ export class Enemy {
 
             if (target) {
                 const distToTarget = MathUtils.distance(this.x, this.y, target.x, target.y);
-                if (distToTarget > 40) {
+                if (distToTarget > 40) { 
                     const angle = MathUtils.angle(this.x, this.y, target.x, target.y);
                     this.x += Math.cos(angle) * this.speed * (dt * 60);
                     this.y += Math.sin(angle) * this.speed * (dt * 60);
@@ -130,7 +171,7 @@ export class Enemy {
         } else {
             let moveSpeed = this.speed;
             if (this.type === 'shooter' && this.isCharging) {
-                moveSpeed = this.speed * 0.2;
+                moveSpeed = this.speed * 0.2; 
             }
             const angle = MathUtils.angle(this.x, this.y, playerX, playerY);
             this.x += Math.cos(angle) * moveSpeed * (dt * 60);
@@ -172,7 +213,7 @@ export class Enemy {
                 ctx.beginPath();
                 const pulse = Math.sin(Date.now() * 0.015) * 4;
                 ctx.arc(0, 0, this.radius + 10 + pulse, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(239, 68, 68, ${this.chargeProgress})`;
+                ctx.strokeStyle = `rgba(239, 68, 68, ${this.chargeProgress})`; 
                 ctx.lineWidth = 3;
                 ctx.stroke();
             }
