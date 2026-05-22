@@ -3,7 +3,7 @@ export class EnemySpawner {
         this.width = canvasWidth;
         this.height = canvasHeight;
         this.spawnTimer = 0;
-        this.baseSpawnRate = 1000;
+        this.baseSpawnRate = 1000; 
     }
 
     update(dt, survivalTimeMS, game) {
@@ -17,7 +17,7 @@ export class EnemySpawner {
     }
 
     spawnEnemy(game, timeMS) {
-          let x, y;
+        let x, y;
         if (Math.random() < 0.5) {
             x = Math.random() < 0.5 ? -30 : this.width + 30;
             y = Math.random() * this.height;
@@ -27,15 +27,30 @@ export class EnemySpawner {
         }
 
         let type = 'basic';
+        let multi = 1 + (timeMS / 60000); 
         const rand = Math.random();
-        if (timeMS > 30000 && rand < 0.3) {
-            type = 'fast';
-        }
-        if (timeMS > 60000 && rand > 0.8) {
-            type = 'heavy';
+        
+        if (timeMS < 45000) {
+            if (rand < 0.1) type = 'fast';
+            else type = 'basic';
+        } else if (timeMS < 90000) {
+            if (rand < 0.15) type = 'heavy';
+            else if (rand < 0.35) type = 'fast';
+            else type = 'basic';
+        } else if (timeMS < 180000) {
+            if (rand < 0.15) type = 'elite';
+            else if (rand < 0.30) type = 'shooter'; 
+            else if (rand < 0.50) type = 'heavy';
+            else if (rand < 0.70) type = 'fast';
+            else type = 'basic';
+        } else {
+            if (rand < 0.3) type = 'elite';
+            else if (rand < 0.5) type = 'shooter';
+            else if (rand < 0.7) type = 'heavy';
+            else type = 'fast';
         }
 
-        game.enemies.push(new game.Enemy(x, y, type));
+        game.enemies.push(new game.Enemy(x, y, type, multi));
     }
 }
 
@@ -45,13 +60,19 @@ export class UpgradeManager {
             { id: 'multishot', title: 'Twin Link', desc: 'Fires an additional projectile.', color: 'text-yellow-400' },
             { id: 'firerate', title: 'Overclock', desc: 'Increases firing speed by 20%.', color: 'text-cyan-400' },
             { id: 'damage', title: 'Plasma Core', desc: 'Increases base damage by 25%.', color: 'text-red-400' },
-            { id: 'speed', title: 'Thruster Mod', desc: 'Increases ship agility.', color: 'text-blue-400' },
+            { id: 'crit', title: 'Targeting Matrix', desc: '+15% chance to deal DOUBLE damage.', color: 'text-purple-400' },
             { id: 'heal', title: 'Nano-Repair', desc: 'Restores 50% Integrity.', color: 'text-green-400' }
         ];
     }
 
-    getUpgrades() {
-        const shuffled = [...this.availableUpgrades].sort(() => 0.5 - Math.random());
+    getUpgrades(gameMode) {
+        let pool = this.availableUpgrades;
+        
+        if (gameMode === 'hardcore') {
+            pool = pool.filter(u => u.id !== 'heal');
+        }
+
+        const shuffled = [...pool].sort(() => 0.5 - Math.random());
         return shuffled.slice(0, 3);
     }
 
@@ -61,13 +82,13 @@ export class UpgradeManager {
                 player.stats.multiShot += 1;
                 break;
             case 'firerate':
-                player.stats.fireRate *= 0.8;
+                player.stats.fireRate *= 0.80; 
                 break;
             case 'damage':
-                player.stats.damage *= 1.25;
+                player.stats.damage *= 1.25; 
                 break;
-            case 'speed':
-                player.stats.speedScale *= 1.2;
+            case 'crit': 
+                player.stats.critChance += 0.15; 
                 break;
             case 'heal':
                 player.health = Math.min(player.maxHealth, player.health + (player.maxHealth * 0.5));

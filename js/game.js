@@ -12,6 +12,8 @@ class GameEngine {
         
         this.isRunning = false;
         this.isPaused = false;
+        this.isCountingDown = false;
+        
         this.lastTime = 0;
         this.startTime = 0;
         this.shakeAmount = 0;
@@ -59,6 +61,10 @@ class GameEngine {
         window.addEventListener('touchend', () => { this.mouse.isDown = false; });
 
         window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.isRunning && !this.isCountingDown && document.getElementById('upgradeScreen').classList.contains('hidden')) {
+                this.togglePause();
+            }
+
             if (this.isPaused && !document.getElementById('upgradeScreen').classList.contains('hidden')) {
                 if (e.key === '1' && this.currentChoices.length >= 1) this.selectUpgrade(0);
                 if (e.key === '2' && this.currentChoices.length >= 2) this.selectUpgrade(1);
@@ -68,8 +74,13 @@ class GameEngine {
         
         document.getElementById('btnStandard').addEventListener('click', () => this.start('standard'));
         document.getElementById('btnHardcore').addEventListener('click', () => this.start('hardcore'));
+        
         document.getElementById('restartBtn').addEventListener('click', () => this.start(this.currentMode));
         document.getElementById('homeBtn').addEventListener('click', () => this.goHome());
+
+        document.getElementById('hudPauseBtn').addEventListener('click', () => this.togglePause());
+        document.getElementById('resumeBtn').addEventListener('click', () => this.resumeWithCountdown());
+        document.getElementById('pauseHomeBtn').addEventListener('click', () => this.goHome());
     }
     
     resize() {
@@ -77,12 +88,55 @@ class GameEngine {
         this.canvas.height = window.innerHeight;
     }
 
+    togglePause() {
+        if (this.isPaused) {
+            this.resumeWithCountdown();
+        } else {
+            this.isPaused = true;
+            document.getElementById('pauseScreen').classList.remove('hidden');
+        }
+    }
+
+    resumeWithCountdown() {
+        document.getElementById('pauseScreen').classList.add('hidden');
+        document.getElementById('upgradeScreen').classList.add('hidden');
+        
+        this.isCountingDown = true;
+        const cdScreen = document.getElementById('countdownScreen');
+        const cdText = document.getElementById('countdownText');
+        cdScreen.classList.remove('hidden');
+        
+        this.mouse.x = this.player.x;
+        this.mouse.y = this.player.y;
+
+        let count = 2;
+        cdText.innerText = count;
+
+        const interval = setInterval(() => {
+            count--;
+            if (count > 0) {
+                cdText.innerText = count;
+            } else if (count === 0) {
+                cdText.innerText = 'GO!';
+            } else {
+                clearInterval(interval);
+                cdScreen.classList.add('hidden');
+                this.isCountingDown = false;
+                this.isPaused = false;
+                this.lastTime = performance.now(); 
+                requestAnimationFrame((time) => this.loop(time));
+            }
+        }, 800); 
+    }
+
     goHome() {
+        this.isRunning = false;
         document.getElementById('gameOverScreen').classList.add('hidden');
+        document.getElementById('pauseScreen').classList.add('hidden');
         document.getElementById('hud').classList.add('hidden');
         document.getElementById('mainMenu').classList.remove('hidden');
         
-        this.ctx.fillStyle = '#0f172a';
+        this.ctx.fillStyle = '#0f172a'; 
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     }
     
@@ -92,6 +146,7 @@ class GameEngine {
         document.getElementById('mainMenu').classList.add('hidden');
         document.getElementById('gameOverScreen').classList.add('hidden');
         document.getElementById('upgradeScreen').classList.add('hidden'); 
+        document.getElementById('pauseScreen').classList.add('hidden'); 
         document.getElementById('hud').classList.remove('hidden');
         
         this.player = new Player(this.canvas.width / 2, this.canvas.height / 2);
@@ -121,6 +176,7 @@ class GameEngine {
         
         this.isRunning = true;
         this.isPaused = false;
+        this.isCountingDown = false;
         this.startTime = performance.now();
         this.lastTime = performance.now();
         requestAnimationFrame((time) => this.loop(time));
@@ -184,7 +240,7 @@ class GameEngine {
         const container = document.getElementById('upgradeCards');
         container.innerHTML = ''; 
         
-        this.currentChoices = this.upgrades.getUpgrades();
+        this.currentChoices = this.upgrades.getUpgrades(this.currentMode);
         
         this.currentChoices.forEach((choice, index) => {
             const card = document.createElement('div');
@@ -206,14 +262,7 @@ class GameEngine {
         if (!choice) return;
 
         this.upgrades.applyUpgrade(choice.id, this.player);
-        document.getElementById('upgradeScreen').classList.add('hidden');
-        this.isPaused = false;
-        
-        this.mouse.x = this.player.x;
-        this.mouse.y = this.player.y;
-
-        this.lastTime = performance.now(); 
-        requestAnimationFrame((time) => this.loop(time));
+        this.resumeWithCountdown(); 
     }
 
     updateHUD() {
@@ -237,7 +286,7 @@ class GameEngine {
     }
     
     loop(currentTime) {
-        if (!this.isRunning || this.isPaused) return;
+        if (!this.isRunning || this.isPaused || this.isCountingDown) return;
         
         const dt = (currentTime - this.lastTime) / 1000;
         this.lastTime = currentTime;
@@ -270,9 +319,14 @@ class GameEngine {
                 const tipX = this.player.x + Math.cos(this.player.angle) * 15;
                 const tipY = this.player.y + Math.sin(this.player.angle) * 15;
                 
+                const isCrit = Math.random() < this.player.stats.critChance;
+                const finalDamage = isCrit ? this.player.stats.damage * 2 : this.player.stats.damage;
+                const bulletColor = isCrit ? '#a855f7' : CONFIG.COLORS.projectile;
+
                 this.projectiles.push(new Projectile(
-                    tipX, tipY, angle, CONFIG.PROJECTILE_SPEED, this.player.stats.damage, CONFIG.COLORS.projectile
+                    tipX, tipY, angle, CONFIG.PROJECTILE_SPEED, finalDamage, bulletColor, false
                 ));
+                this.projectiles[this.projectiles.length - 1].isCrit = isCrit;
             }
             this.player.lastShotTime = currentTime;
             this.triggerShake(1.5);
@@ -287,14 +341,24 @@ class GameEngine {
                 continue;
             }
 
-            for (let j = this.enemies.length - 1; j >= 0; j--) {
-                const e = this.enemies[j];
-                if (MathUtils.distance(p.x, p.y, e.x, e.y) < p.radius + e.radius) {
-                    e.takeDamage(p.damage);
+            if (p.isEnemy) {
+                if (MathUtils.distance(p.x, p.y, this.player.x, this.player.y) < p.radius + this.player.radius) {
+                    this.damagePlayer(p.damage);
                     p.markedForDeletion = true;
-                    this.spawnParticles(p.x, p.y, 5, p.color, 0.5); 
-                    this.floatingTexts.push(new FloatingText(e.x, e.y - 15, Math.floor(p.damage)));
-                    break;
+                    this.spawnParticles(p.x, p.y, 5, p.color, 0.5);
+                }
+            } else {
+                for (let j = this.enemies.length - 1; j >= 0; j--) {
+                    const e = this.enemies[j];
+                    if (MathUtils.distance(p.x, p.y, e.x, e.y) < p.radius + e.radius) {
+                        e.takeDamage(p.damage);
+                        p.markedForDeletion = true;
+                        this.spawnParticles(p.x, p.y, 5, p.color, 0.5); 
+                        
+                        const textColor = p.isCrit ? '#a855f7' : '#ffffff';
+                        this.floatingTexts.push(new FloatingText(e.x, e.y - 15, Math.floor(p.damage), textColor, p.isCrit));
+                        break;
+                    }
                 }
             }
         }
@@ -302,6 +366,12 @@ class GameEngine {
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
             e.update(this.player.x, this.player.y, dt);
+            
+            if (e.type === 'shooter' && currentTime - e.lastShotTime > e.fireRate) {
+                const angleToPlayer = MathUtils.angle(e.x, e.y, this.player.x, this.player.y);
+                this.projectiles.push(new Projectile(e.x, e.y, angleToPlayer, 4, 15, '#ef4444', true));
+                e.lastShotTime = currentTime;
+            }
             
             if (MathUtils.distance(e.x, e.y, this.player.x, this.player.y) < e.radius + this.player.radius) {
                 this.damagePlayer(15);

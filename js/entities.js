@@ -1,4 +1,5 @@
 import { MathUtils, CONFIG } from './math.js';
+
 export class Particle {
     constructor(x, y, vx, vy, radius, color, life, glow = false) {
         this.x = x;
@@ -36,7 +37,7 @@ export class Particle {
 }
 
 export class Projectile {
-    constructor(x, y, angle, speed, damage, color) {
+    constructor(x, y, angle, speed, damage, color, isEnemy = false) {
         this.x = x;
         this.y = y;
         this.vx = Math.cos(angle) * speed;
@@ -45,6 +46,8 @@ export class Projectile {
         this.damage = damage;
         this.color = color;
         this.markedForDeletion = false;
+        this.isCrit = false;
+        this.isEnemy = isEnemy; 
     }
 
     update(dt) {
@@ -60,15 +63,26 @@ export class Projectile {
         ctx.shadowBlur = 15;
         ctx.shadowColor = this.color;
         ctx.fillStyle = '#fff';
-        ctx.beginPath();
-        ctx.roundRect(-8, -2, 16, 4, 2);
-        ctx.fill();
         
-        ctx.fillStyle = this.color;
-        ctx.globalAlpha = 0.6;
-        ctx.beginPath();
-        ctx.roundRect(-10, -4, 20, 8, 4);
-        ctx.fill();
+        if (this.isEnemy) {
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath();
+            ctx.arc(0, 0, this.radius + 6, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.beginPath();
+            ctx.roundRect(-8, -2, 16, 4, 2);
+            ctx.fill();
+            ctx.fillStyle = this.color;
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath();
+            ctx.roundRect(-10, -4, 20, 8, 4);
+            ctx.fill();
+        }
         ctx.restore();
     }
 }
@@ -86,7 +100,8 @@ export class Player {
             fireRate: CONFIG.BASE_FIRE_RATE,
             damage: CONFIG.BASE_DAMAGE,
             multiShot: 1,
-            speedScale: 1
+            speedScale: 1,
+            critChance: 0
         };
         
         this.lastShotTime = 0;
@@ -125,64 +140,93 @@ export class Player {
         ctx.restore();
     }
 }
+
 export class Enemy {
-    constructor(x, y, type = 'basic') {
+    constructor(x, y, type = 'basic', multi = 1) {
         this.x = x;
         this.y = y;
         this.type = type;
         this.markedForDeletion = false;
-        this.hitFlashTimer = 0;
-
-
+        this.hitFlashTimer = 0;      
+        this.lastShotTime = 0; 
+        this.fireRate = 2500; 
         switch(type) {
             case 'fast':
                 this.radius = 8;
                 this.speed = 2.5;
-                this.health = 15;
-                this.color = '#f97316';
-                this.xpValue = 2;
+                this.health = 15; 
+                this.color = '#f97316'; 
+                this.xpValue = Math.floor(2 * multi);
                 break;
             case 'heavy':
                 this.radius = 20;
                 this.speed = 0.5;
-                this.health = 80;
-                this.color = '#8b5cf6';
-                this.xpValue = 10;
+                this.health = 80; 
+                this.color = '#8b5cf6'; 
+                this.xpValue = Math.floor(10 * multi);
                 break;
-            default: // basic
+            case 'elite': 
+                this.radius = 16;
+                this.speed = 1.6;
+                this.health = 120; 
+                this.color = '#eab308'; 
+                this.xpValue = Math.floor(25 * multi);
+                break;
+            case 'shooter': 
+                this.radius = 14;
+                this.speed = 0.6; 
+                this.health = 40;
+                this.color = '#3b82f6'; 
+                this.xpValue = Math.floor(8 * multi);
+                break;
+            default:
                 this.radius = 12;
                 this.speed = 1.2;
-                this.health = 30;
-                this.color = CONFIG.COLORS.enemy;
-                this.xpValue = 5;
+                this.health = 30; 
+                this.color = CONFIG.COLORS.enemy; 
+                this.xpValue = Math.floor(5 * multi);
         }
         this.maxHealth = this.health;
     }
 
     takeDamage(amount) {
         this.health -= amount;
-        this.hitFlashTimer = 5;
+        this.hitFlashTimer = 5; 
         if (this.health <= 0) this.markedForDeletion = true;
     }
 
     update(playerX, playerY, dt) {
         const angle = MathUtils.angle(this.x, this.y, playerX, playerY);
         this.x += Math.cos(angle) * this.speed * (dt * 60);
-        this.y += Math.sin(angle) * this.speed * (dt * 60);     
+        this.y += Math.sin(angle) * this.speed * (dt * 60);
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
     }
 
     draw(ctx) {
         ctx.save();
         ctx.translate(this.x, this.y);
+        
         const angle = MathUtils.angle(0, 0, this.vx || 1, this.vy || 1);
         ctx.rotate(angle);
+
         ctx.shadowBlur = 15;
         ctx.shadowColor = this.color;
         ctx.fillStyle = this.hitFlashTimer > 0 ? '#ffffff' : this.color;
+        
         ctx.beginPath();
         if (this.type === 'heavy') {
             ctx.rect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+        } else if (this.type === 'elite') {
+            for(let i=0; i<6; i++) {
+                ctx.lineTo(this.radius * Math.cos(i * Math.PI / 3), this.radius * Math.sin(i * Math.PI / 3));
+            }
+            ctx.closePath();
+        } else if (this.type === 'shooter') {
+            ctx.moveTo(0, -this.radius);
+            ctx.lineTo(this.radius, 0);
+            ctx.lineTo(0, this.radius);
+            ctx.lineTo(-this.radius, 0);
+            ctx.closePath();
         } else if (this.type === 'fast') {
             ctx.moveTo(this.radius, 0);
             ctx.lineTo(-this.radius, this.radius);
@@ -201,7 +245,7 @@ export class XPGem {
         this.x = x;
         this.y = y;
         this.value = value;
-        this.radius = 4 + Math.min(value, 6);
+        this.radius = Math.min(12, 4 + Math.sqrt(value));
         this.color = CONFIG.COLORS.xp;
         this.markedForDeletion = false;
         this.magnetized = false;
@@ -232,14 +276,16 @@ export class XPGem {
         ctx.restore();
     }
 }
+
 export class FloatingText {
-    constructor(x, y, text, color = '#ffffff') {
+    constructor(x, y, text, color = '#ffffff', isCrit = false) {
         this.x = x;
         this.y = y;
         this.text = text;
         this.color = color;
         this.alpha = 1;
         this.vy = -1;
+        this.isCrit = isCrit;
     }
 
     update(dt) {
@@ -250,7 +296,7 @@ export class FloatingText {
     draw(ctx) {
         ctx.save();
         ctx.globalAlpha = Math.max(0, this.alpha);
-        ctx.font = 'bold 16px Rajdhani';
+        ctx.font = this.isCrit ? 'bold 22px Rajdhani' : 'bold 16px Rajdhani';
         ctx.fillStyle = this.color;
         ctx.shadowBlur = 4;
         ctx.shadowColor = '#000';
