@@ -1,5 +1,3 @@
-// js/systems.js
-
 export class EnemySpawner {
     constructor(canvasWidth, canvasHeight) {
         this.width = canvasWidth;
@@ -56,7 +54,6 @@ export class EnemySpawner {
             else type = 'fast'; 
         }
 
-        // Pass timeMS into constructor to sync internal clocks
         game.enemies.push(new game.Enemy(x, y, type, timeMS));
     }
 }

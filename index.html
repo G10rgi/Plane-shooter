@@ -9,13 +9,10 @@
 </head>
 <body class="bg-gray-900 overflow-hidden text-white select-none">
     
-    <!-- Game Canvas -->
     <canvas id="gameCanvas" class="absolute top-0 left-0 w-full h-full z-0"></canvas>
 
-    <!-- Damage Vignette Overlay -->
     <div id="damageOverlay" class="pointer-events-none absolute inset-0 bg-red-600 opacity-0 transition-opacity duration-100 z-10"></div>
 
-    <!-- HUD -->
     <div id="hud" class="absolute top-0 left-0 w-full h-full pointer-events-none z-20 hidden p-6 flex flex-col justify-between">
         <div class="flex justify-between items-start">
             <div class="glass-panel p-4 rounded-lg w-64 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
@@ -50,7 +47,6 @@
         </div>
     </div>
 
-    <!-- Main Menu -->
     <div id="mainMenu" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-md z-50">
         <div class="text-center mb-8">
             <h1 class="text-7xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 drop-shadow-[0_0_20px_rgba(6,182,212,0.5)] mb-2 pr-6">NEON VANGUARD</h1>
@@ -79,7 +75,6 @@
             </button>
         </div>
 
-        <!-- NEW: Hangar Skin Selector with SVG Ships -->
         <h2 class="text-white text-lg font-bold tracking-widest mb-4 uppercase text-center border-b border-gray-700 pb-2">Hangar: Select Fighter</h2>
         <div class="flex gap-4 max-w-4xl px-6" id="skinSelector">
             <button data-skin="0" data-color="border-cyan-500" class="skin-btn flex-1 glass-panel p-4 rounded-lg border-2 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all hover:-translate-y-1 text-center">
@@ -147,12 +142,10 @@
         </div>
     </div>
 
-    <!-- Countdown Screen -->
     <div id="countdownScreen" class="absolute inset-0 flex items-center justify-center bg-transparent z-50 pointer-events-none hidden">
         <h1 id="countdownText" class="text-9xl font-black tracking-widest text-white drop-shadow-[0_0_30px_rgba(6,182,212,1)] animate-pulse">2</h1>
     </div>
 
-    <!-- Game Over Screen -->
     <div id="gameOverScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-red-900/90 backdrop-blur-md z-50 hidden">
         <h1 class="text-6xl font-black tracking-widest text-red-500 mb-4 drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]">SYSTEM FAILURE</h1>
         <p class="text-xl text-gray-300 mb-2">Survival Time: <span id="finalTime" class="text-white font-mono">00:00</span></p>
