@@ -3,16 +3,18 @@ export class EnemySpawner {
         this.width = canvasWidth;
         this.height = canvasHeight;
         this.spawnTimer = 0;
-        this.baseSpawnRate = 1000; 
     }
 
     update(dt, survivalTimeMS, game) {
         this.spawnTimer += dt * 1000;
-        const currentSpawnRate = Math.max(200, this.baseSpawnRate - (survivalTimeMS * 0.005));
+        const pulseRate = survivalTimeMS > 180000 ? 1800 : 2500;
+        const squadSize = survivalTimeMS > 180000 ? 4 : 3;
 
-        if (this.spawnTimer > currentSpawnRate) {
+        if (this.spawnTimer > pulseRate) {
             this.spawnTimer = 0;
-            this.spawnEnemy(game, survivalTimeMS);
+            for(let i = 0; i < squadSize; i++) {
+                this.spawnEnemy(game, survivalTimeMS);
+            }
         }
     }
 
@@ -27,30 +29,33 @@ export class EnemySpawner {
         }
 
         let type = 'basic';
-        let multi = 1 + (timeMS / 60000); 
         const rand = Math.random();
         
-        if (timeMS < 45000) {
-            if (rand < 0.1) type = 'fast';
+        const activeShooters = game.enemies.filter(e => e.type === 'shooter').length;
+
+        if (timeMS < 120000) {
+            if (rand < 0.20) type = 'fast';
+            else if (rand < 0.30 && timeMS > 60000) type = 'heavy';
             else type = 'basic';
-        } else if (timeMS < 90000) {
-            if (rand < 0.15) type = 'heavy';
-            else if (rand < 0.35) type = 'fast';
+        } 
+
+        else if (timeMS < 240000) {
+            if (rand < 0.15 && activeShooters < 3) type = 'shooter';
+            else if (rand < 0.35) type = 'shield';
+            else if (rand < 0.55) type = 'heavy';
+            else if (rand < 0.75) type = 'fast';
             else type = 'basic';
-        } else if (timeMS < 180000) {
-            if (rand < 0.15) type = 'elite';
-            else if (rand < 0.30) type = 'shooter'; 
-            else if (rand < 0.50) type = 'heavy';
-            else if (rand < 0.70) type = 'fast';
-            else type = 'basic';
-        } else {
-            if (rand < 0.3) type = 'elite';
-            else if (rand < 0.5) type = 'shooter';
-            else if (rand < 0.7) type = 'heavy';
-            else type = 'fast';
+        } 
+
+        else {
+            if (rand < 0.20) type = 'elite';
+            else if (rand < 0.40 && activeShooters < 5) type = 'shooter';
+            else if (rand < 0.60) type = 'shield';
+            else if (rand < 0.80) type = 'heavy';
+            else type = 'fast'; 
         }
 
-        game.enemies.push(new game.Enemy(x, y, type, multi));
+        game.enemies.push(new game.Enemy(x, y, type));
     }
 }
 
@@ -67,29 +72,19 @@ export class UpgradeManager {
 
     getUpgrades(gameMode) {
         let pool = this.availableUpgrades;
-        
         if (gameMode === 'hardcore') {
             pool = pool.filter(u => u.id !== 'heal');
         }
-
         const shuffled = [...pool].sort(() => 0.5 - Math.random());
         return shuffled.slice(0, 3);
     }
 
     applyUpgrade(id, player) {
         switch(id) {
-            case 'multishot':
-                player.stats.multiShot += 1;
-                break;
-            case 'firerate':
-                player.stats.fireRate *= 0.80; 
-                break;
-            case 'damage':
-                player.stats.damage *= 1.25; 
-                break;
-            case 'crit': 
-                player.stats.critChance += 0.15; 
-                break;
+            case 'multishot': player.stats.multiShot += 1; break;
+            case 'firerate': player.stats.fireRate *= 0.80; break;
+            case 'damage': player.stats.damage *= 1.25; break;
+            case 'crit': player.stats.critChance += 0.15; break;
             case 'heal':
                 player.health = Math.min(player.maxHealth, player.health + (player.maxHealth * 0.5));
                 document.getElementById('healthBar').style.width = `${(player.health / player.maxHealth) * 100}%`;

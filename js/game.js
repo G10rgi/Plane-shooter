@@ -46,16 +46,15 @@ class GameEngine {
         });
         window.addEventListener('mousedown', () => this.mouse.isDown = true);
         window.addEventListener('mouseup', () => this.mouse.isDown = false);
-
         window.addEventListener('touchstart', (e) => {
             this.isTouch = true;
             this.mouse.x = e.touches[0].clientX;
-            this.mouse.y = e.touches[0].clientY;
+            this.mouse.y = e.touches[0].clientY - 100;
             this.mouse.isDown = true;
         }, { passive: false });
         window.addEventListener('touchmove', (e) => {
             this.mouse.x = e.touches[0].clientX;
-            this.mouse.y = e.touches[0].clientY;
+            this.mouse.y = e.touches[0].clientY - 100;
             e.preventDefault(); 
         }, { passive: false });
         window.addEventListener('touchend', () => { this.mouse.isDown = false; });
@@ -154,9 +153,6 @@ class GameEngine {
         if (mode === 'hardcore') {
             this.player.health = 1;
             this.player.maxHealth = 1;
-            this.spawner.baseSpawnRate = 600; 
-        } else {
-            this.spawner.baseSpawnRate = 1000; 
         }
 
         this.mouse.x = this.canvas.width / 2;
@@ -351,26 +347,62 @@ class GameEngine {
                 for (let j = this.enemies.length - 1; j >= 0; j--) {
                     const e = this.enemies[j];
                     if (MathUtils.distance(p.x, p.y, e.x, e.y) < p.radius + e.radius) {
-                        e.takeDamage(p.damage);
-                        p.markedForDeletion = true;
-                        this.spawnParticles(p.x, p.y, 5, p.color, 0.5); 
                         
-                        const textColor = p.isCrit ? '#a855f7' : '#ffffff';
-                        this.floatingTexts.push(new FloatingText(e.x, e.y - 15, Math.floor(p.damage), textColor, p.isCrit));
+                        let isProtected = false;
+                        if (e.type !== 'shield') {
+                            isProtected = this.enemies.some(drone => 
+                                drone.type === 'shield' && 
+                                !drone.markedForDeletion && 
+                                MathUtils.distance(e.x, e.y, drone.x, drone.y) <= 60 
+                            );
+                        }
+
+                        if (isProtected) {
+                            p.markedForDeletion = true;
+                            this.spawnParticles(p.x, p.y, 3, '#2dd4bf', 0.5); 
+                            this.floatingTexts.push(new FloatingText(e.x, e.y - 15, "BLOCKED", '#2dd4bf', false));
+                        } else {
+                            e.takeDamage(p.damage);
+                            p.markedForDeletion = true;
+                            this.spawnParticles(p.x, p.y, 5, p.color, 0.5); 
+                            
+                            const textColor = p.isCrit ? '#a855f7' : '#ffffff';
+                            this.floatingTexts.push(new FloatingText(e.x, e.y - 15, Math.floor(p.damage), textColor, p.isCrit));
+                        }
                         break;
                     }
                 }
             }
         }
 
+        const activeEnemyBullets = this.projectiles.filter(p => p.isEnemy).length;
+
         for (let i = this.enemies.length - 1; i >= 0; i--) {
             const e = this.enemies[i];
-            e.update(this.player.x, this.player.y, dt);
-            
-            if (e.type === 'shooter' && currentTime - e.lastShotTime > e.fireRate) {
-                const angleToPlayer = MathUtils.angle(e.x, e.y, this.player.x, this.player.y);
-                this.projectiles.push(new Projectile(e.x, e.y, angleToPlayer, 4, 15, '#ef4444', true));
-                e.lastShotTime = currentTime;
+            e.update(this.player.x, this.player.y, dt, this.enemies);
+        
+            if (e.type === 'shooter') {
+                if (!e.isCharging && currentTime - e.lastShotTime > e.fireRate) {
+                    if (activeEnemyBullets < 30) {
+                        e.isCharging = true;
+                        e.chargeProgress = 0;
+                        e.chargeStartTime = currentTime;
+                        e.fireRate = 3000 + Math.random() * 1000; 
+                    }
+                }
+
+                if (e.isCharging) {
+                    let chargeTime = currentTime - e.chargeStartTime;
+                    e.chargeProgress = Math.min(1, chargeTime / 1000);
+                    
+                    if (chargeTime >= 1000) {
+                        const angleToPlayer = MathUtils.angle(e.x, e.y, this.player.x, this.player.y);
+                        this.projectiles.push(new Projectile(e.x, e.y, angleToPlayer, 3.5, 15, '#ef4444', true));
+                        e.lastShotTime = currentTime;
+                        e.isCharging = false;
+                        e.chargeProgress = 0;
+                    }
+                }
             }
             
             if (MathUtils.distance(e.x, e.y, this.player.x, this.player.y) < e.radius + this.player.radius) {
