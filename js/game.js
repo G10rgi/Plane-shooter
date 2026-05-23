@@ -291,7 +291,9 @@ class GameEngine {
         
         this.mouse.x = this.player.x;
         this.mouse.y = this.player.y;
+        
         this.slowMoTimer = 3000; 
+        this.player.invulnerableTimer = 2000;
 
         requestAnimationFrame((time) => {
             this.lastTime = time;
@@ -353,6 +355,7 @@ class GameEngine {
         if (this.mouse.isDown && this.gameTime - this.player.lastShotTime > this.player.stats.fireRate) {
             const spread = 0.15;
             const startAngle = this.player.angle - (spread * (this.player.stats.multiShot - 1)) / 2;
+            
             const currentProjSpeed = this.slowMoTimer > 0 ? CONFIG.PROJECTILE_SPEED * 1.8 : CONFIG.PROJECTILE_SPEED;
 
             for(let i = 0; i < this.player.stats.multiShot; i++) {
@@ -385,7 +388,9 @@ class GameEngine {
 
             if (p.isEnemy) {
                 if (MathUtils.distance(p.x, p.y, this.player.x, this.player.y) < p.radius + this.player.radius) {
-                    this.damagePlayer(p.damage);
+                    if (this.player.invulnerableTimer <= 0) {
+                        this.damagePlayer(p.damage);
+                    }
                     p.markedForDeletion = true;
                     this.spawnParticles(p.x, p.y, 5, p.color, 0.5);
                 }
@@ -453,7 +458,9 @@ class GameEngine {
             }
             
             if (MathUtils.distance(e.x, e.y, this.player.x, this.player.y) < e.radius + this.player.radius) {
-                this.damagePlayer(15);
+                if (this.player.invulnerableTimer <= 0) {
+                    this.damagePlayer(15);
+                }
                 e.markedForDeletion = true; 
             }
 

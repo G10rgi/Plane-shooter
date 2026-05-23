@@ -53,19 +53,35 @@ export class Player {
         this.stats = { fireRate: CONFIG.BASE_FIRE_RATE, damage: CONFIG.BASE_DAMAGE, multiShot: 1, speedScale: 1, critChance: 0 };
         this.lastShotTime = 0;
         
+        this.invulnerableTimer = 0;
+        
         this.skinId = skinId;
-        const skinColors = ['#06b6d4', '#3b82f6', '#ef4444', '#f97316', '#a855f7']; 
+        const skinColors = ['#06b6d4', '#ef4444', '#3b82f6', '#f97316', '#a855f7']; 
         this.color = skinColors[skinId] || skinColors[0];
     }
+    
     update(targetX, targetY, dt, isShooting = false) {
         if (!isShooting) {
             this.x = MathUtils.lerp(this.x, targetX, CONFIG.PLAYER_SPEED * this.stats.speedScale * (dt * 60));
             this.y = MathUtils.lerp(this.y, targetY, CONFIG.PLAYER_SPEED * this.stats.speedScale * (dt * 60));
         }
         this.angle = MathUtils.angle(this.x, this.y, targetX, targetY);
+        
+        if (this.invulnerableTimer > 0) {
+            this.invulnerableTimer -= dt * 1000;
+        }
     }
+    
     draw(ctx) {
         ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+        
+        if (this.invulnerableTimer > 0) {
+            if (Math.floor(Date.now() / 100) % 2 === 0) {
+                ctx.globalAlpha = 0.3; 
+            } else {
+                ctx.globalAlpha = 0.9;
+            }
+        }
         
         ctx.shadowBlur = 20; 
         ctx.shadowColor = this.color; 
@@ -73,28 +89,47 @@ export class Player {
         
         ctx.beginPath();
         switch(this.skinId) {
-            case 0: 
+            case 0:
                 ctx.moveTo(22, 0); ctx.lineTo(-15, 18); ctx.lineTo(-5, 0); ctx.lineTo(-15, -18); 
                 break;
             case 1: 
-                ctx.moveTo(24, 0); ctx.lineTo(6, 8); ctx.lineTo(-10, 22); ctx.lineTo(-16, 10); 
-                ctx.lineTo(-22, 12); ctx.lineTo(-22, -12); ctx.lineTo(-16, -10); ctx.lineTo(-10, -22); 
-                ctx.lineTo(6, -8); 
+                ctx.moveTo(36, 0);
+                ctx.lineTo(14, -3);
+                ctx.lineTo(6, -6);
+                ctx.lineTo(-4, -16);
+                ctx.lineTo(-16, -30);
+                ctx.lineTo(-22, -26);
+                ctx.lineTo(-28, -6);
+                ctx.lineTo(-28, -3);
+                ctx.lineTo(-36, 0);
+                ctx.lineTo(-28, 3);
+                ctx.lineTo(-28, 6);
+                ctx.lineTo(-22, 26);
+                ctx.lineTo(-16, 30);
+                ctx.lineTo(-4, 16);
+                ctx.lineTo(6, 6);
+                ctx.lineTo(14, 3);
                 break;
-            case 2: 
-                ctx.moveTo(26, 0); ctx.lineTo(10, 4); ctx.lineTo(-12, 26); ctx.lineTo(-18, 26); 
-                ctx.lineTo(-14, 5); ctx.lineTo(-24, 8); ctx.lineTo(-24, -8); ctx.lineTo(-14, -5); 
-                ctx.lineTo(-18, -26); ctx.lineTo(-12, -26); ctx.lineTo(10, -4); 
+            case 2:
+                ctx.moveTo(30, 0); ctx.lineTo(12, 4); ctx.lineTo(2, 8); ctx.lineTo(-18, 28); 
+                ctx.lineTo(-24, 26); ctx.lineTo(-16, 10); ctx.lineTo(-22, 16); ctx.lineTo(-28, 14); 
+                ctx.lineTo(-26, 6); ctx.lineTo(-24, 0); 
+                ctx.lineTo(-26, -6); ctx.lineTo(-28, -14); ctx.lineTo(-22, -16); ctx.lineTo(-16, -10); 
+                ctx.lineTo(-24, -26); ctx.lineTo(-18, -28); ctx.lineTo(2, -8); ctx.lineTo(12, -4);
                 break;
-            case 3: 
-                ctx.moveTo(24, 0); ctx.lineTo(12, 5); ctx.lineTo(-2, 24); ctx.lineTo(-14, 24); 
-                ctx.lineTo(-14, 6); ctx.lineTo(-24, 10); ctx.lineTo(-24, -10); ctx.lineTo(-14, -6); 
-                ctx.lineTo(-14, -24); ctx.lineTo(-2, -24); ctx.lineTo(12, -5); 
+            case 3:
+                ctx.moveTo(28, 0); ctx.lineTo(16, 2); ctx.lineTo(8, 6); ctx.lineTo(0, 6); 
+                ctx.lineTo(-8, 24); ctx.lineTo(-16, 24); ctx.lineTo(-16, 8); ctx.lineTo(-24, 12); 
+                ctx.lineTo(-28, 12); ctx.lineTo(-26, 6); ctx.lineTo(-24, 0); 
+                ctx.lineTo(-26, -6); ctx.lineTo(-28, -12); ctx.lineTo(-24, -12); ctx.lineTo(-16, -8); 
+                ctx.lineTo(-16, -24); ctx.lineTo(-8, -24); ctx.lineTo(0, -6); ctx.lineTo(8, -6); ctx.lineTo(16, -2);
                 break;
-            case 4: 
-                ctx.moveTo(30, 0); ctx.lineTo(5, 5); ctx.lineTo(-5, 18); ctx.lineTo(-12, 18); 
-                ctx.lineTo(-8, 6); ctx.lineTo(-24, 6); ctx.lineTo(-24, -6); ctx.lineTo(-8, -6); 
-                ctx.lineTo(-12, -18); ctx.lineTo(-5, -18); ctx.lineTo(5, -5); 
+            case 4:
+                ctx.moveTo(30, 0); ctx.lineTo(8, 3); ctx.lineTo(2, 7); ctx.lineTo(-4, 9); 
+                ctx.lineTo(-14, 24); ctx.lineTo(-24, 24); ctx.lineTo(-28, 9); ctx.lineTo(-24, 6); 
+                ctx.lineTo(-30, 0); 
+                ctx.lineTo(-24, -6); ctx.lineTo(-28, -9); ctx.lineTo(-24, -24); ctx.lineTo(-14, -24); 
+                ctx.lineTo(-4, -9); ctx.lineTo(2, -7); ctx.lineTo(8, -3);
                 break;
         }
         ctx.closePath(); 
@@ -118,17 +153,28 @@ export class Enemy {
 
         switch(type) {
             case 'fast': 
-                this.radius = 10;
-                this.speed = 3.2; 
-                this.health = 15; 
-                this.color = '#f97316';
-                this.xpValue = 2; 
+                this.radius = 10; this.speed = 3.2; this.health = 15; 
+                this.color = '#f97316'; this.xpValue = 5; 
                 break;
-            case 'shield': this.radius = 16; this.speed = 1.0; this.health = 60; this.color = '#2dd4bf'; this.xpValue = 20; break;
-            case 'heavy': this.radius = 20; this.speed = 0.5; this.health = 80; this.color = '#8b5cf6'; this.xpValue = 10; break;
-            case 'elite': this.radius = 16; this.speed = 1.6; this.health = 120; this.color = '#eab308'; this.xpValue = 30; break;
-            case 'shooter': this.radius = 16; this.speed = 0.7; this.health = 40; this.color = '#3b82f6'; this.xpValue = 12; break;
-            default: this.radius = 12; this.speed = 1.2; this.health = 30; this.color = '#a3e635'; this.xpValue = 5;
+            case 'shield': 
+                this.radius = 16; this.speed = 1.0; this.health = 60; 
+                this.color = '#2dd4bf'; this.xpValue = 40; 
+                break;
+            case 'heavy': 
+                this.radius = 20; this.speed = 0.5; this.health = 80; 
+                this.color = '#8b5cf6'; this.xpValue = 25; 
+                break;
+            case 'elite': 
+                this.radius = 16; this.speed = 1.6; this.health = 120; 
+                this.color = '#eab308'; this.xpValue = 60; 
+                break;
+            case 'shooter': 
+                this.radius = 16; this.speed = 0.7; this.health = 40; 
+                this.color = '#3b82f6'; this.xpValue = 20; 
+                break;
+            default:
+                this.radius = 12; this.speed = 1.2; this.health = 30; 
+                this.color = '#a3e635'; this.xpValue = 5;
         }
         this.maxHealth = this.health;
     }
