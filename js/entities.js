@@ -2,43 +2,143 @@ import { MathUtils, CONFIG } from './math.js';
 
 export class Particle {
     constructor(x, y, vx, vy, radius, color, life, glow = false) {
-        this.x = x; this.y = y; this.vx = vx; this.vy = vy;
-        this.radius = radius; this.color = color;
-        this.alpha = 1; this.lifeDecay = 1 / life; this.glow = glow;
+        this.x = x; 
+        this.y = y; 
+        this.vx = vx; 
+        this.vy = vy;
+        this.radius = radius; 
+        this.color = color;
+        this.alpha = 1; 
+        this.lifeDecay = 1 / life; 
+        this.glow = glow;
     }
+    
     update(dt) {
-        this.x += this.vx * (dt * 60); this.y += this.vy * (dt * 60);
-        this.vx *= 0.95; this.vy *= 0.95; this.alpha -= this.lifeDecay * (dt * 60);
+        this.x += this.vx * (dt * 60); 
+        this.y += this.vy * (dt * 60);
+        this.vx *= 0.95; 
+        this.vy *= 0.95; 
+        this.alpha -= this.lifeDecay * (dt * 60);
     }
+    
     draw(ctx) {
-        ctx.save(); ctx.globalAlpha = Math.max(0, this.alpha);
-        ctx.beginPath(); ctx.arc(this.x, this.y, Math.max(0, this.radius), 0, Math.PI * 2);
+        ctx.save(); 
+        ctx.globalAlpha = Math.max(0, this.alpha);
+        ctx.beginPath(); 
+        ctx.arc(this.x, this.y, Math.max(0, this.radius), 0, Math.PI * 2);
         ctx.fillStyle = this.color;
-        if(this.glow) { ctx.shadowBlur = 10; ctx.shadowColor = this.color; }
-        ctx.fill(); ctx.restore();
+        if (this.glow) { 
+            ctx.shadowBlur = 10; 
+            ctx.shadowColor = this.color; 
+        }
+        ctx.fill(); 
+        ctx.restore();
     }
 }
 
 export class Projectile {
-    constructor(x, y, angle, speed, damage, color, isEnemy = false) {
-        this.x = x; this.y = y; this.vx = Math.cos(angle) * speed; this.vy = Math.sin(angle) * speed;
-        this.radius = 4; this.damage = damage; this.color = color;
-        this.markedForDeletion = false; this.isCrit = false; this.isEnemy = isEnemy; 
+    // Added 'isHoming' to the constructor
+    constructor(x, y, angle, speed, damage, color, isEnemy = false, isPiercing = false, isHoming = false) {
+        this.x = x; 
+        this.y = y; 
+        this.vx = Math.cos(angle) * speed; 
+        this.vy = Math.sin(angle) * speed;
+        this.radius = 4; 
+        this.damage = damage; 
+        this.color = color;
+        this.markedForDeletion = false; 
+        this.isCrit = false; 
+        this.isEnemy = isEnemy; 
+        this.isPiercing = isPiercing; 
+        this.isHoming = isHoming; 
     }
-    update(dt) {
-        this.x += this.vx * (dt * 60); this.y += this.vy * (dt * 60);
+    
+    // Updated to accept enemies array for tracking targets
+    update(dt, enemies = []) {
+        if (this.isHoming && enemies.length > 0) {
+            let target = null;
+            let minDist = 600; // Tracking range
+            
+            // Find closest enemy
+            for (let e of enemies) {
+                if (e.markedForDeletion) continue;
+                let d = MathUtils.distance(this.x, this.y, e.x, e.y);
+                if (d < minDist) { 
+                    minDist = d; 
+                    target = e; 
+                }
+            }
+            
+            // Steer towards the target
+            if (target) {
+                const targetAngle = MathUtils.angle(this.x, this.y, target.x, target.y);
+                const currentAngle = Math.atan2(this.vy, this.vx);
+                
+                // Calculate the shortest rotation path
+                let diff = targetAngle - currentAngle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                
+                const turnRate = 5 * dt; 
+                const newAngle = currentAngle + Math.sign(diff) * Math.min(Math.abs(diff), turnRate);
+                
+                const speed = Math.min(CONFIG.PROJECTILE_SPEED * 1.5, Math.sqrt(this.vx * this.vx + this.vy * this.vy) + (10 * dt)); 
+                
+                this.vx = Math.cos(newAngle) * speed;
+                this.vy = Math.sin(newAngle) * speed;
+            }
+        }
+        
+        this.x += this.vx * (dt * 60); 
+        this.y += this.vy * (dt * 60);
     }
+    
     draw(ctx) {
-        ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(Math.atan2(this.vy, this.vx));
-        ctx.shadowBlur = 15; ctx.shadowColor = this.color; ctx.fillStyle = '#fff';
+        ctx.save(); 
+        ctx.translate(this.x, this.y); 
+        ctx.rotate(Math.atan2(this.vy, this.vx));
+        ctx.shadowBlur = 15; 
+        ctx.shadowColor = this.color; 
+        ctx.fillStyle = '#fff';
+        
         if (this.isEnemy) {
-            ctx.beginPath(); ctx.arc(0, 0, this.radius + 2, 0, Math.PI * 2); ctx.fill();
-            ctx.fillStyle = this.color; ctx.globalAlpha = 0.6;
-            ctx.beginPath(); ctx.arc(0, 0, this.radius + 6, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); 
+            ctx.arc(0, 0, this.radius + 2, 0, Math.PI * 2); 
+            ctx.fill();
+            ctx.fillStyle = this.color; 
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath(); 
+            ctx.arc(0, 0, this.radius + 6, 0, Math.PI * 2); 
+            ctx.fill();
+        } else if (this.isHoming) {
+            ctx.beginPath(); 
+            ctx.roundRect(-8, -3, 16, 6, 2); 
+            ctx.fill();
+            ctx.fillStyle = this.color; 
+            ctx.globalAlpha = 0.8;
+            ctx.beginPath(); 
+            ctx.moveTo(-8, -5); ctx.lineTo(-2, 0); ctx.lineTo(-8, 5); ctx.fill();
+            ctx.fillStyle = '#ef4444';
+            ctx.globalAlpha = 1;
+            ctx.beginPath(); 
+            ctx.arc(-10, 0, 2 + Math.random() * 2, 0, Math.PI * 2); 
+            ctx.fill();
         } else {
-            ctx.beginPath(); ctx.roundRect(-8, -2, 16, 4, 2); ctx.fill();
-            ctx.fillStyle = this.color; ctx.globalAlpha = 0.6;
-            ctx.beginPath(); ctx.roundRect(-10, -4, 20, 8, 4); ctx.fill();
+            ctx.beginPath(); 
+            ctx.roundRect(-8, -2, 16, 4, 2); 
+            ctx.fill();
+            ctx.fillStyle = this.color; 
+            ctx.globalAlpha = 0.6;
+            ctx.beginPath(); 
+            ctx.roundRect(-10, -4, 20, 8, 4); 
+            ctx.fill();
+            
+            if (this.isPiercing) { 
+                ctx.fillStyle = '#fff';
+                ctx.beginPath(); 
+                ctx.roundRect(-4, -1, 24, 2, 1); 
+                ctx.fill();
+            }
         }
         ctx.restore();
     }
@@ -46,14 +146,26 @@ export class Projectile {
 
 export class Player {
     constructor(x, y, skinId = 0) {
-        this.x = x; this.y = y; 
+        this.x = x; 
+        this.y = y; 
         this.radius = 18; 
         this.angle = 0;
-        this.health = CONFIG.PLAYER_MAX_HEALTH; this.maxHealth = CONFIG.PLAYER_MAX_HEALTH;
-        this.stats = { fireRate: CONFIG.BASE_FIRE_RATE, damage: CONFIG.BASE_DAMAGE, multiShot: 1, speedScale: 1, critChance: 0 };
+        this.health = CONFIG.PLAYER_MAX_HEALTH; 
+        this.maxHealth = CONFIG.PLAYER_MAX_HEALTH;
+        this.stats = { 
+            fireRate: CONFIG.BASE_FIRE_RATE, 
+            damage: CONFIG.BASE_DAMAGE, 
+            multiShot: 1, 
+            speedScale: 1, 
+            critChance: 0 
+        };
         this.lastShotTime = 0;
         
         this.invulnerableTimer = 0;
+        this.abilityTimer = 0;
+        this.isGhost = false; 
+        this.isWingSweepActive = false;
+        this.activeAbilityTime = 0;
         
         this.skinId = skinId;
         const skinColors = ['#06b6d4', '#ef4444', '#3b82f6', '#f97316', '#a855f7']; 
@@ -61,26 +173,35 @@ export class Player {
     }
     
     update(targetX, targetY, dt, isShooting = false) {
+        // FIX: Replaced "|| this.isWingSweepActive" so plane stops properly when shooting!
         if (!isShooting) {
-            this.x = MathUtils.lerp(this.x, targetX, CONFIG.PLAYER_SPEED * this.stats.speedScale * (dt * 60));
-            this.y = MathUtils.lerp(this.y, targetY, CONFIG.PLAYER_SPEED * this.stats.speedScale * (dt * 60));
+            let speedMod = this.isWingSweepActive ? 0.7 : 1;
+            this.x = MathUtils.lerp(this.x, targetX, (CONFIG.PLAYER_SPEED * speedMod) * this.stats.speedScale * (dt * 60));
+            this.y = MathUtils.lerp(this.y, targetY, (CONFIG.PLAYER_SPEED * speedMod) * this.stats.speedScale * (dt * 60));
         }
+        
         this.angle = MathUtils.angle(this.x, this.y, targetX, targetY);
         
-        if (this.invulnerableTimer > 0) {
-            this.invulnerableTimer -= dt * 1000;
+        if (this.invulnerableTimer > 0) this.invulnerableTimer -= dt * 1000;
+        if (this.abilityTimer > 0) this.abilityTimer -= dt * 1000;
+        
+        if (this.activeAbilityTime > 0) {
+            this.activeAbilityTime -= dt * 1000;
+        } else {
+            this.isGhost = false;
+            this.isWingSweepActive = false;
         }
     }
     
     draw(ctx) {
-        ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+        ctx.save(); 
+        ctx.translate(this.x, this.y); 
+        ctx.rotate(this.angle);
         
-        if (this.invulnerableTimer > 0) {
-            if (Math.floor(Date.now() / 100) % 2 === 0) {
-                ctx.globalAlpha = 0.3; 
-            } else {
-                ctx.globalAlpha = 0.9;
-            }
+        if (this.isGhost) {
+            ctx.globalAlpha = 0.2;
+        } else if (this.invulnerableTimer > 0) {
+            ctx.globalAlpha = Math.floor(Date.now() / 100) % 2 === 0 ? 0.3 : 0.9;
         }
         
         ctx.shadowBlur = 20; 
@@ -89,53 +210,48 @@ export class Player {
         
         ctx.beginPath();
         switch(this.skinId) {
-            case 0:
-                ctx.moveTo(22, 0); ctx.lineTo(-15, 18); ctx.lineTo(-5, 0); ctx.lineTo(-15, -18); 
+            case 0: 
+                ctx.moveTo(22, 0); 
+                ctx.lineTo(-15, 18); 
+                ctx.lineTo(-5, 0); 
+                ctx.lineTo(-15, -18); 
                 break;
             case 1: 
-                ctx.moveTo(36, 0);
-                ctx.lineTo(14, -3);
-                ctx.lineTo(6, -6);
-                ctx.lineTo(-4, -16);
-                ctx.lineTo(-16, -30);
-                ctx.lineTo(-22, -26);
-                ctx.lineTo(-28, -6);
-                ctx.lineTo(-28, -3);
-                ctx.lineTo(-36, 0);
-                ctx.lineTo(-28, 3);
-                ctx.lineTo(-28, 6);
-                ctx.lineTo(-22, 26);
-                ctx.lineTo(-16, 30);
-                ctx.lineTo(-4, 16);
-                ctx.lineTo(6, 6);
-                ctx.lineTo(14, 3);
+                ctx.moveTo(36, 0); ctx.lineTo(14, -3); ctx.lineTo(6, -6); ctx.lineTo(-4, -16); 
+                ctx.lineTo(-16, -30); ctx.lineTo(-22, -26); ctx.lineTo(-28, -6); ctx.lineTo(-28, -3); ctx.lineTo(-36, 0);
+                ctx.lineTo(-28, 3); ctx.lineTo(-28, 6); ctx.lineTo(-22, 26); ctx.lineTo(-16, 30); ctx.lineTo(-4, 16); ctx.lineTo(6, 6); ctx.lineTo(14, 3);
                 break;
-            case 2:
-                ctx.moveTo(30, 0); ctx.lineTo(12, 4); ctx.lineTo(2, 8); ctx.lineTo(-18, 28); 
-                ctx.lineTo(-24, 26); ctx.lineTo(-16, 10); ctx.lineTo(-22, 16); ctx.lineTo(-28, 14); 
-                ctx.lineTo(-26, 6); ctx.lineTo(-24, 0); 
-                ctx.lineTo(-26, -6); ctx.lineTo(-28, -14); ctx.lineTo(-22, -16); ctx.lineTo(-16, -10); 
-                ctx.lineTo(-24, -26); ctx.lineTo(-18, -28); ctx.lineTo(2, -8); ctx.lineTo(12, -4);
+            case 2: 
+                if (this.isWingSweepActive) {
+                    ctx.moveTo(30, 0); ctx.lineTo(12, 4); ctx.lineTo(2, 6); ctx.lineTo(-20, 15); ctx.lineTo(-24, 13); 
+                    ctx.lineTo(-16, 8); ctx.lineTo(-22, 16); ctx.lineTo(-28, 14); ctx.lineTo(-26, 6); ctx.lineTo(-24, 0);
+                    ctx.lineTo(-26, -6); ctx.lineTo(-28, -14); ctx.lineTo(-22, -16); ctx.lineTo(-16, -8); 
+                    ctx.lineTo(-24, -13); ctx.lineTo(-20, -15); ctx.lineTo(2, -6); ctx.lineTo(12, -4);
+                } else {
+                    ctx.moveTo(30, 0); ctx.lineTo(12, 4); ctx.lineTo(2, 8); ctx.lineTo(-18, 28); ctx.lineTo(-24, 26); 
+                    ctx.lineTo(-16, 10); ctx.lineTo(-22, 16); ctx.lineTo(-28, 14); ctx.lineTo(-26, 6); ctx.lineTo(-24, 0); 
+                    ctx.lineTo(-26, -6); ctx.lineTo(-28, -14); ctx.lineTo(-22, -16); ctx.lineTo(-16, -10); ctx.lineTo(-24, -26); ctx.lineTo(-18, -28); ctx.lineTo(2, -8); ctx.lineTo(12, -4);
+                }
                 break;
-            case 3:
-                ctx.moveTo(28, 0); ctx.lineTo(16, 2); ctx.lineTo(8, 6); ctx.lineTo(0, 6); 
-                ctx.lineTo(-8, 24); ctx.lineTo(-16, 24); ctx.lineTo(-16, 8); ctx.lineTo(-24, 12); 
-                ctx.lineTo(-28, 12); ctx.lineTo(-26, 6); ctx.lineTo(-24, 0); 
-                ctx.lineTo(-26, -6); ctx.lineTo(-28, -12); ctx.lineTo(-24, -12); ctx.lineTo(-16, -8); 
+            case 3: 
+                ctx.moveTo(28, 0); ctx.lineTo(16, 2); ctx.lineTo(8, 6); ctx.lineTo(0, 6); ctx.lineTo(-8, 24); ctx.lineTo(-16, 24); ctx.lineTo(-16, 8); ctx.lineTo(-24, 12); 
+                ctx.lineTo(-28, 12); ctx.lineTo(-26, 6); ctx.lineTo(-24, 0); ctx.lineTo(-26, -6); ctx.lineTo(-28, -12); ctx.lineTo(-24, -12); ctx.lineTo(-16, -8); 
                 ctx.lineTo(-16, -24); ctx.lineTo(-8, -24); ctx.lineTo(0, -6); ctx.lineTo(8, -6); ctx.lineTo(16, -2);
                 break;
-            case 4:
-                ctx.moveTo(30, 0); ctx.lineTo(8, 3); ctx.lineTo(2, 7); ctx.lineTo(-4, 9); 
-                ctx.lineTo(-14, 24); ctx.lineTo(-24, 24); ctx.lineTo(-28, 9); ctx.lineTo(-24, 6); 
-                ctx.lineTo(-30, 0); 
-                ctx.lineTo(-24, -6); ctx.lineTo(-28, -9); ctx.lineTo(-24, -24); ctx.lineTo(-14, -24); 
-                ctx.lineTo(-4, -9); ctx.lineTo(2, -7); ctx.lineTo(8, -3);
+            case 4: 
+                ctx.moveTo(30, 0); ctx.lineTo(8, 3); ctx.lineTo(2, 7); ctx.lineTo(-4, 9); ctx.lineTo(-14, 24); ctx.lineTo(-24, 24); ctx.lineTo(-28, 9); ctx.lineTo(-24, 6); 
+                ctx.lineTo(-30, 0); ctx.lineTo(-24, -6); ctx.lineTo(-28, -9); ctx.lineTo(-24, -24); ctx.lineTo(-14, -24); ctx.lineTo(-4, -9); ctx.lineTo(2, -7); ctx.lineTo(8, -3);
                 break;
         }
         ctx.closePath(); 
         ctx.fill();
         
-        ctx.fillStyle = '#fff'; ctx.shadowBlur = 0; ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; 
+        ctx.shadowBlur = 0; 
+        ctx.beginPath(); 
+        ctx.arc(0, 0, 4, 0, Math.PI * 2); 
+        ctx.fill();
+        
         ctx.restore();
     }
 }
@@ -144,51 +260,34 @@ export class Enemy {
     constructor(x, y, type = 'basic', spawnTime = 0) {
         this.x = x; this.y = y; this.type = type;
         this.markedForDeletion = false; this.hitFlashTimer = 0;
-        
         this.lastShotTime = spawnTime + Math.random() * 2000; 
-        this.fireRate = 3500; 
-        this.isCharging = false;
-        this.chargeProgress = 0;
-        this.chargeStartTime = 0;
+        this.fireRate = 3500; this.isCharging = false; this.chargeProgress = 0; this.chargeStartTime = 0;
 
         switch(type) {
-            case 'fast': 
-                this.radius = 10; this.speed = 3.2; this.health = 15; 
-                this.color = '#f97316'; this.xpValue = 5; 
-                break;
-            case 'shield': 
-                this.radius = 16; this.speed = 1.0; this.health = 60; 
-                this.color = '#2dd4bf'; this.xpValue = 40; 
-                break;
-            case 'heavy': 
-                this.radius = 20; this.speed = 0.5; this.health = 80; 
-                this.color = '#8b5cf6'; this.xpValue = 25; 
-                break;
-            case 'elite': 
-                this.radius = 16; this.speed = 1.6; this.health = 120; 
-                this.color = '#eab308'; this.xpValue = 60; 
-                break;
-            case 'shooter': 
-                this.radius = 16; this.speed = 0.7; this.health = 40; 
-                this.color = '#3b82f6'; this.xpValue = 20; 
-                break;
-            default:
-                this.radius = 12; this.speed = 1.2; this.health = 30; 
-                this.color = '#a3e635'; this.xpValue = 5;
+            case 'fast': this.radius = 10; this.speed = 3.2; this.health = 15; this.color = '#f97316'; this.xpValue = 5; break;
+            case 'shield': this.radius = 16; this.speed = 1.0; this.health = 60; this.color = '#2dd4bf'; this.xpValue = 40; break;
+            case 'heavy': this.radius = 20; this.speed = 0.5; this.health = 80; this.color = '#8b5cf6'; this.xpValue = 25; break;
+            case 'elite': this.radius = 16; this.speed = 1.6; this.health = 120; this.color = '#eab308'; this.xpValue = 60; break;
+            case 'shooter': this.radius = 16; this.speed = 0.7; this.health = 40; this.color = '#3b82f6'; this.xpValue = 20; break;
+            default: this.radius = 12; this.speed = 1.2; this.health = 30; this.color = '#a3e635'; this.xpValue = 5;
         }
         this.maxHealth = this.health;
     }
 
     takeDamage(amount) {
-        this.health -= amount; this.hitFlashTimer = 5; 
+        this.health -= amount; 
+        this.hitFlashTimer = 5; 
         if (this.health <= 0) this.markedForDeletion = true;
     }
 
-    update(playerX, playerY, dt, allEnemies) {
+    update(playerX, playerY, dt, allEnemies, isPlayerGhost) {
         if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
+        let tX = isPlayerGhost ? this.x + (this.vx || 1) * 100 : playerX;
+        let tY = isPlayerGhost ? this.y + (this.vy || 1) * 100 : playerY;
+
         if (this.type === 'shield') {
-            let target = null;
+            let target = null; 
             let bestWeight = -1;
             
             for (let e of allEnemies) {
@@ -196,36 +295,29 @@ export class Enemy {
                 const dist = MathUtils.distance(this.x, this.y, e.x, e.y);
                 let typeMultiplier = e.type === 'elite' ? 3 : (e.type === 'shooter' ? 2 : (e.type === 'heavy' ? 1.5 : 1));
                 let score = (1000 / (dist + 1)) * typeMultiplier;
-                
-                if (score > bestWeight) {
-                    bestWeight = score;
-                    target = e;
-                }
+                if (score > bestWeight) { bestWeight = score; target = e; }
             }
 
             if (target) {
-                const distToTarget = MathUtils.distance(this.x, this.y, target.x, target.y);
-                if (distToTarget > 40) { 
+                if (MathUtils.distance(this.x, this.y, target.x, target.y) > 40) { 
                     const angle = MathUtils.angle(this.x, this.y, target.x, target.y);
-                    this.x += Math.cos(angle) * this.speed * (dt * 60);
-                    this.y += Math.sin(angle) * this.speed * (dt * 60);
+                    this.x += Math.cos(angle) * this.speed * (dt * 60); this.y += Math.sin(angle) * this.speed * (dt * 60);
                 } else {
-                    this.x += Math.cos(Date.now() * 0.001) * 0.2;
-                    this.y += Math.sin(Date.now() * 0.001) * 0.2;
+                    this.x += Math.cos(Date.now() * 0.001) * 0.2; this.y += Math.sin(Date.now() * 0.001) * 0.2;
                 }
-            } else {
-                const angle = MathUtils.angle(this.x, this.y, playerX, playerY);
-                this.x -= Math.cos(angle) * (this.speed * 0.5) * (dt * 60);
-                this.y -= Math.sin(angle) * (this.speed * 0.5) * (dt * 60);
+            } else if (!isPlayerGhost) {
+                const angle = MathUtils.angle(this.x, this.y, tX, tY);
+                this.x -= Math.cos(angle) * (this.speed * 0.5) * (dt * 60); this.y -= Math.sin(angle) * (this.speed * 0.5) * (dt * 60);
             }
         } else {
-            let moveSpeed = this.speed;
-            if (this.type === 'shooter' && this.isCharging) {
-                moveSpeed = this.speed * 0.2; 
-            }
-            const angle = MathUtils.angle(this.x, this.y, playerX, playerY);
+            let moveSpeed = (this.type === 'shooter' && this.isCharging) ? this.speed * 0.2 : this.speed;
+            const angle = MathUtils.angle(this.x, this.y, tX, tY);
+            
             this.x += Math.cos(angle) * moveSpeed * (dt * 60);
             this.y += Math.sin(angle) * moveSpeed * (dt * 60);
+            
+            this.vx = Math.cos(angle); 
+            this.vy = Math.sin(angle); 
         }
     }
 
@@ -239,39 +331,23 @@ export class Enemy {
         }
 
         const angle = MathUtils.angle(0, 0, this.vx || 1, this.vy || 1);
-        ctx.rotate(angle);
-        ctx.shadowBlur = 15; ctx.shadowColor = this.color;
+        ctx.rotate(angle); ctx.shadowBlur = 15; ctx.shadowColor = this.color;
         ctx.fillStyle = this.hitFlashTimer > 0 ? '#ffffff' : this.color;
         
         ctx.beginPath();
-        if (this.type === 'heavy') {
-            ctx.rect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
-        } else if (this.type === 'shield') {
-            for(let i=0; i<8; i++) { ctx.lineTo(this.radius * Math.cos(i * Math.PI / 4), this.radius * Math.sin(i * Math.PI / 4)); }
-            ctx.closePath();
-        } else if (this.type === 'elite') {
-            for(let i=0; i<6; i++) { ctx.lineTo(this.radius * Math.cos(i * Math.PI / 3), this.radius * Math.sin(i * Math.PI / 3)); }
-            ctx.closePath();
-        } else if (this.type === 'shooter') {
-            ctx.moveTo(0, -this.radius - 4);
-            ctx.lineTo(this.radius + 4, 0);
-            ctx.lineTo(0, this.radius + 4);
-            ctx.lineTo(-this.radius - 4, 0);
-            ctx.closePath();
-
+        if (this.type === 'heavy') ctx.rect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+        else if (this.type === 'shield') { for(let i=0; i<8; i++) ctx.lineTo(this.radius * Math.cos(i * Math.PI / 4), this.radius * Math.sin(i * Math.PI / 4)); ctx.closePath(); }
+        else if (this.type === 'elite') { for(let i=0; i<6; i++) ctx.lineTo(this.radius * Math.cos(i * Math.PI / 3), this.radius * Math.sin(i * Math.PI / 3)); ctx.closePath(); }
+        else if (this.type === 'shooter') {
+            ctx.moveTo(0, -this.radius - 4); ctx.lineTo(this.radius + 4, 0); ctx.lineTo(0, this.radius + 4); ctx.lineTo(-this.radius - 4, 0); ctx.closePath();
             if (this.isCharging) {
-                ctx.beginPath();
-                const pulse = Math.sin(Date.now() * 0.015) * 4;
-                ctx.arc(0, 0, this.radius + 10 + pulse, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(239, 68, 68, ${this.chargeProgress})`; 
-                ctx.lineWidth = 3;
-                ctx.stroke();
+                ctx.beginPath(); ctx.arc(0, 0, this.radius + 10 + Math.sin(Date.now() * 0.015) * 4, 0, Math.PI * 2);
+                ctx.strokeStyle = `rgba(239, 68, 68, ${this.chargeProgress})`; ctx.lineWidth = 3; ctx.stroke();
             }
-        } else if (this.type === 'fast') {
-            ctx.moveTo(this.radius + 4, 0); ctx.lineTo(-this.radius, this.radius - 2); ctx.lineTo(-this.radius, -this.radius + 2); ctx.closePath();
-        } else {
-            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-        }
+        } 
+        else if (this.type === 'fast') { ctx.moveTo(this.radius + 4, 0); ctx.lineTo(-this.radius, this.radius - 2); ctx.lineTo(-this.radius, -this.radius + 2); ctx.closePath(); }
+        else ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        
         ctx.fill(); ctx.restore();
     }
 }
@@ -282,17 +358,19 @@ export class XPGem {
         this.radius = Math.min(12, 4 + Math.sqrt(value));
         this.color = CONFIG.COLORS.xp; this.markedForDeletion = false; this.magnetized = false;
     }
+    
     update(playerX, playerY, dt) {
-        const dist = MathUtils.distance(this.x, this.y, playerX, playerY);
-        if (dist < 100 || this.magnetized) {
+        if (MathUtils.distance(this.x, this.y, playerX, playerY) < 100 || this.magnetized) {
             this.magnetized = true;
             const angle = MathUtils.angle(this.x, this.y, playerX, playerY);
             this.x += Math.cos(angle) * 8 * (dt * 60); this.y += Math.sin(angle) * 8 * (dt * 60);
         }
     }
+    
     draw(ctx) {
         ctx.save(); ctx.shadowBlur = 10; ctx.shadowColor = this.color; ctx.fillStyle = this.color;
-        ctx.beginPath(); ctx.moveTo(this.x, this.y - this.radius); ctx.lineTo(this.x + this.radius, this.y); ctx.lineTo(this.x, this.y + this.radius); ctx.lineTo(this.x - this.radius, this.y); ctx.closePath(); ctx.fill(); ctx.restore();
+        ctx.beginPath(); ctx.moveTo(this.x, this.y - this.radius); ctx.lineTo(this.x + this.radius, this.y); ctx.lineTo(this.x, this.y + this.radius); ctx.lineTo(this.x - this.radius, this.y); ctx.closePath(); ctx.fill(); 
+        ctx.restore();
     }
 }
 
@@ -301,11 +379,11 @@ export class FloatingText {
         this.x = x; this.y = y; this.text = text; this.color = color;
         this.alpha = 1; this.vy = -1; this.isCrit = isCrit;
     }
+    
     update(dt) { this.y += this.vy * (dt * 60); this.alpha -= 0.02 * (dt * 60); }
+    
     draw(ctx) {
-        ctx.save(); ctx.globalAlpha = Math.max(0, this.alpha);
-        ctx.font = this.isCrit ? 'bold 22px Rajdhani' : 'bold 16px Rajdhani';
-        ctx.fillStyle = this.color; ctx.shadowBlur = 4; ctx.shadowColor = '#000';
-        ctx.textAlign = 'center'; ctx.fillText(this.text, this.x, this.y); ctx.restore();
+        ctx.save(); ctx.globalAlpha = Math.max(0, this.alpha); ctx.font = this.isCrit ? 'bold 22px Rajdhani' : 'bold 16px Rajdhani';
+        ctx.fillStyle = this.color; ctx.shadowBlur = 4; ctx.shadowColor = '#000'; ctx.textAlign = 'center'; ctx.fillText(this.text, this.x, this.y); ctx.restore();
     }
 }

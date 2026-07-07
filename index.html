@@ -6,27 +6,53 @@
     <title>Neon Vanguard - Endless Survival</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="css/style.css">
+    <style>
+        .glass-panel { 
+            background: rgba(17, 24, 39, 0.7); 
+            backdrop-filter: blur(10px); 
+        }
+    </style>
 </head>
 <body class="bg-gray-900 overflow-hidden text-white select-none">
     
-
+    <!-- Game Canvas -->
     <canvas id="gameCanvas" class="absolute top-0 left-0 w-full h-full z-0"></canvas>
 
+    <!-- Damage Vignette Overlay -->
     <div id="damageOverlay" class="pointer-events-none absolute inset-0 bg-red-600 opacity-0 transition-opacity duration-100 z-10"></div>
 
+    <!-- HUD -->
     <div id="hud" class="absolute top-0 left-0 w-full h-full pointer-events-none z-20 hidden p-6 flex flex-col justify-between">
         <div class="flex justify-between items-start">
-            <div class="glass-panel p-4 rounded-lg w-64 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
-                <h2 class="text-cyan-400 font-bold uppercase tracking-widest text-sm mb-1">Integrity</h2>
-                <div class="w-full bg-gray-800 h-4 rounded overflow-hidden">
-                    <div id="healthBar" class="bg-cyan-500 h-full w-full shadow-[0_0_10px_rgba(6,182,212,0.8)] transition-all duration-200"></div>
+            
+            <!-- Left Side: Health & Abilities -->
+            <div class="flex flex-col gap-4">
+                <div class="glass-panel p-4 rounded-lg w-64 border border-cyan-500/30 shadow-[0_0_15px_rgba(6,182,212,0.2)]">
+                    <h2 class="text-cyan-400 font-bold uppercase tracking-widest text-sm mb-1">Integrity</h2>
+                    <div class="w-full bg-gray-800 h-4 rounded overflow-hidden">
+                        <div id="healthBar" class="bg-cyan-500 h-full w-full shadow-[0_0_10px_rgba(6,182,212,0.8)] transition-all duration-200"></div>
+                    </div>
+                    <div class="mt-3 flex justify-between text-xs text-gray-400 font-mono">
+                        <span>LVL <span id="levelDisplay" class="text-cyan-300 text-lg">1</span></span>
+                        <span>SCORE: <span id="scoreDisplay" class="text-white">0</span></span>
+                    </div>
                 </div>
-                <div class="mt-3 flex justify-between text-xs text-gray-400 font-mono">
-                    <span>LVL <span id="levelDisplay" class="text-cyan-300 text-lg">1</span></span>
-                    <span>SCORE: <span id="scoreDisplay" class="text-white">0</span></span>
+
+                <!-- Ability HUD -->
+                <div class="glass-panel p-3 rounded-lg border border-yellow-500/30 flex items-center gap-3 w-64 shadow-[0_0_10px_rgba(234,179,8,0.1)]">
+                    <div class="w-12 h-10 bg-gray-800 rounded flex items-center justify-center border border-yellow-500/50 text-yellow-500 font-black text-xs">
+                        SPACE
+                    </div>
+                    <div class="flex-1">
+                        <h3 id="abilityName" class="text-yellow-400 font-bold text-xs uppercase tracking-wider">SYSTEM READY</h3>
+                        <div class="w-full bg-gray-800 h-2 mt-1 rounded overflow-hidden">
+                            <div id="abilityCooldown" class="bg-yellow-500 h-full w-full" style="transition: width 0.1s linear;"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
             
+            <!-- Right Side: Time -->
             <div class="flex gap-4 items-start">
                 <div class="glass-panel p-3 rounded-lg text-center border border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
                     <span class="text-red-400 text-xs font-bold tracking-widest block">SURVIVAL TIME</span>
@@ -40,6 +66,7 @@
             </div>
         </div>
 
+        <!-- Bottom: XP Bar -->
         <div class="w-full flex flex-col items-center pb-4">
             <span class="text-xs text-cyan-400 mb-1 tracking-widest">EXPERIENCE DATA</span>
             <div class="w-3/4 max-w-2xl bg-gray-800/80 h-2 rounded-full overflow-hidden backdrop-blur-sm border border-gray-700">
@@ -48,6 +75,7 @@
         </div>
     </div>
 
+    <!-- Main Menu -->
     <div id="mainMenu" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/90 backdrop-blur-md z-50">
         <div class="text-center mb-8">
             <h1 class="text-7xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-600 drop-shadow-[0_0_20px_rgba(6,182,212,0.5)] mb-2 pr-6">NEON VANGUARD</h1>
@@ -76,15 +104,16 @@
             </button>
         </div>
 
+        <!-- Hangar Skin Selector -->
         <h2 class="text-white text-lg font-bold tracking-widest mb-4 uppercase text-center border-b border-gray-700 pb-2">Hangar: Select Fighter</h2>
-        <div class="flex gap-4 max-w-4xl px-6" id="skinSelector">
+        <div class="flex gap-4 max-w-5xl px-6" id="skinSelector">
             <button data-skin="0" data-color="border-cyan-500" class="skin-btn flex-1 glass-panel p-4 rounded-lg border-2 border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.6)] transition-all hover:-translate-y-1 text-center">
                 <h4 class="text-cyan-400 font-bold tracking-wider text-sm">VANGUARD</h4>
                 <svg viewBox="-35 -35 70 70" class="w-16 h-16 mx-auto my-3 text-cyan-500 transform -rotate-90 drop-shadow-[0_0_8px_rgba(6,182,212,0.8)]">
                     <path fill="currentColor" d="M 22 0 L -15 18 L -5 0 L -15 -18 Z" />
                     <circle cx="0" cy="0" r="4" fill="white" />
                 </svg>
-                <div class="text-xs text-gray-400">Balanced</div>
+                <div class="text-xs text-gray-400 font-bold">EMP BLAST</div>
             </button>
             <button data-skin="1" data-color="border-red-500" class="skin-btn flex-1 glass-panel p-4 rounded-lg border-2 border-transparent hover:border-red-500 transition-all hover:-translate-y-1 text-center">
                 <h4 class="text-red-500 font-bold tracking-wider text-sm">F-47 STRIKER</h4>
@@ -92,7 +121,7 @@
                     <path fill="currentColor" d="M 36 0 L 14 -3 L 6 -6 L -4 -16 L -16 -30 L -22 -26 L -28 -6 L -28 -3 L -36 0 L -28 3 L -28 6 L -22 26 L -16 30 L -4 16 L 6 6 L 14 3 Z" />
                     <circle cx="0" cy="0" r="4" fill="white" />
                 </svg>
-                <div class="text-xs text-gray-400">Stealth</div>
+                <div class="text-xs text-gray-400 font-bold">GHOST PROTOCOL</div>
             </button>
             <button data-skin="2" data-color="border-blue-500" class="skin-btn flex-1 glass-panel p-4 rounded-lg border-2 border-transparent hover:border-blue-500 transition-all hover:-translate-y-1 text-center">
                 <h4 class="text-blue-500 font-bold tracking-wider text-sm">F-14 TOMCAT</h4>
@@ -100,7 +129,7 @@
                     <path fill="currentColor" d="M 30 0 L 12 4 L 2 8 L -18 28 L -24 26 L -16 10 L -22 16 L -28 14 L -26 6 L -24 0 L -26 -6 L -28 -14 L -22 -16 L -16 -10 L -24 -26 L -18 -28 L 2 -8 L 12 -4 Z" />
                     <circle cx="0" cy="0" r="4" fill="white" />
                 </svg>
-                <div class="text-xs text-gray-400">Swept Wing</div>
+                <div class="text-xs text-gray-400 font-bold">WING-SWEEP</div>
             </button>
             <button data-skin="3" data-color="border-orange-500" class="skin-btn flex-1 glass-panel p-4 rounded-lg border-2 border-transparent hover:border-orange-500 transition-all hover:-translate-y-1 text-center">
                 <h4 class="text-orange-500 font-bold tracking-wider text-sm">F-15 EAGLE</h4>
@@ -108,7 +137,7 @@
                     <path fill="currentColor" d="M 28 0 L 16 2 L 8 6 L 0 6 L -8 24 L -16 24 L -16 8 L -24 12 L -28 12 L -26 6 L -24 0 L -26 -6 L -28 -12 L -24 -12 L -16 -8 L -16 -24 L -8 -24 L 0 -6 L 8 -6 L 16 -2 Z" />
                     <circle cx="0" cy="0" r="4" fill="white" />
                 </svg>
-                <div class="text-xs text-gray-400">Air Superiority</div>
+                <div class="text-xs text-gray-400 font-bold">MISSILE VOLLEY</div>
             </button>
             <button data-skin="4" data-color="border-purple-500" class="skin-btn flex-1 glass-panel p-4 rounded-lg border-2 border-transparent hover:border-purple-500 transition-all hover:-translate-y-1 text-center">
                 <h4 class="text-purple-500 font-bold tracking-wider text-sm">SR-71</h4>
@@ -116,11 +145,12 @@
                     <path fill="currentColor" d="M 30 0 L 8 3 L 2 7 L -4 9 L -14 24 L -24 24 L -28 9 L -24 6 L -30 0 L -24 -6 L -28 -9 L -24 -24 L -14 -24 L -4 -9 L 2 -7 L 8 -3 Z" />
                     <circle cx="0" cy="0" r="4" fill="white" />
                 </svg>
-                <div class="text-xs text-gray-400">Blackbird</div>
+                <div class="text-xs text-gray-400 font-bold">PHASE-SHIFT</div>
             </button>
         </div>
     </div>
 
+    <!-- Upgrade Screen -->
     <div id="upgradeScreen" class="absolute inset-0 flex items-center justify-center bg-gray-900/80 backdrop-blur-md z-40 hidden">
         <div class="w-full max-w-4xl p-8">
             <h2 class="text-3xl text-cyan-400 font-bold text-center mb-2 tracking-widest uppercase">System Upgrade Available</h2>
@@ -129,6 +159,7 @@
         </div>
     </div>
 
+    <!-- Pause Screen -->
     <div id="pauseScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/80 backdrop-blur-md z-40 hidden">
         <h1 class="text-6xl font-black tracking-widest text-white mb-8 drop-shadow-[0_0_20px_rgba(255,255,255,0.5)]">SYSTEM PAUSED</h1>
         <div class="flex gap-4">
@@ -141,10 +172,12 @@
         </div>
     </div>
 
+    <!-- Countdown Screen -->
     <div id="countdownScreen" class="absolute inset-0 flex items-center justify-center bg-transparent z-50 pointer-events-none hidden">
         <h1 id="countdownText" class="text-9xl font-black tracking-widest text-white drop-shadow-[0_0_30px_rgba(6,182,212,1)] animate-pulse">2</h1>
     </div>
- 
+
+    <!-- Game Over Screen -->
     <div id="gameOverScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-red-900/90 backdrop-blur-md z-50 hidden">
         <h1 class="text-6xl font-black tracking-widest text-red-500 mb-4 drop-shadow-[0_0_20px_rgba(239,68,68,0.8)]">SYSTEM FAILURE</h1>
         <p class="text-xl text-gray-300 mb-2">Survival Time: <span id="finalTime" class="text-white font-mono">00:00</span></p>
