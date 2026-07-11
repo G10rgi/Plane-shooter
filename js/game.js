@@ -1,5 +1,5 @@
 import { MathUtils, CONFIG } from './math.js';
-import { Player, Projectile, Particle, Enemy, XPGem, FloatingText } from './entities.js';
+import { Player, Projectile, Particle, Enemy, XPGem, FloatingText, PowerUp } from './entities.js';
 import { EnemySpawner, UpgradeManager } from './systems.js';
 
 class GameEngine {
@@ -10,39 +10,40 @@ class GameEngine {
         this.spawner = new EnemySpawner(window.innerWidth, window.innerHeight);
         this.upgrades = new UpgradeManager();
         
-        this.isRunning = false;
-        this.isPaused = false;
+        this.isRunning = false; 
+        this.isPaused = false; 
         this.isCountingDown = false;
         
-        this.lastTime = 0;
+        this.lastTime = 0; 
         this.gameTime = 0; 
         this.slowMoTimer = 0; 
         this.timeSlowActive = 0; 
         
-        this.shakeAmount = 0;
+        this.shakeAmount = 0; 
         this.score = 0;
         
-        this.level = 1;
-        this.xp = 0;
+        this.level = 1; 
+        this.xp = 0; 
         this.xpToNextLevel = 20;
+        
         this.currentChoices = []; 
         this.currentMode = 'standard'; 
         this.currentSkin = 0; 
         
         this.mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2, isDown: false };
-        this.isTouch = false;
-        
+        this.isTouch = false; 
         this.Enemy = Enemy;
+        
         this.init();
     }
     
     init() {
         this.resize();
         
-        window.addEventListener('resize', () => {
-            this.resize();
-            this.spawner.width = this.canvas.width;
-            this.spawner.height = this.canvas.height;
+        window.addEventListener('resize', () => { 
+            this.resize(); 
+            this.spawner.width = this.canvas.width; 
+            this.spawner.height = this.canvas.height; 
         });
         
         window.addEventListener('mousemove', (e) => { 
@@ -50,22 +51,45 @@ class GameEngine {
             this.mouse.y = e.clientY; 
         });
         
-        window.addEventListener('mousedown', () => {
-            this.mouse.isDown = true;
+        window.addEventListener('mousedown', () => { 
+            this.mouse.isDown = true; 
         });
         
-        window.addEventListener('mouseup', () => {
-            this.mouse.isDown = false;
+        window.addEventListener('mouseup', () => { 
+            this.mouse.isDown = false; 
         });
 
-        window.addEventListener('touchstart', (e) => {
+        // removing rightclick menu and ability activation conflict
+        window.addEventListener('contextmenu', (e) => {
+            e.preventDefault(); 
+            if (this.isRunning && !this.isPaused && !this.isCountingDown) {
+                this.activatePlayerAbility();
+            }
+        }, false);
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && this.isRunning && !this.isPaused && !this.isCountingDown) {
+                this.activatePlayerAbility();
+            }
+            if (e.key === 'Escape' && this.isRunning && !this.isCountingDown && document.getElementById('upgradeScreen').classList.contains('hidden')) { 
+                this.togglePause(); 
+            }
+            if (this.isPaused && !document.getElementById('upgradeScreen').classList.contains('hidden')) { 
+                if (e.key === '1' && this.currentChoices.length >= 1) this.selectUpgrade(0); 
+                if (e.key === '2' && this.currentChoices.length >= 2) this.selectUpgrade(1); 
+                if (e.key === '3' && this.currentChoices.length >= 3) this.selectUpgrade(2); 
+            }
+        });
+
+        // Touch support
+        window.addEventListener('touchstart', (e) => { 
             this.isTouch = true; 
             this.mouse.x = e.touches[0].clientX; 
             this.mouse.y = e.touches[0].clientY - 100; 
-            this.mouse.isDown = true;
+            this.mouse.isDown = true; 
         }, { passive: false });
         
-        window.addEventListener('touchmove', (e) => {
+        window.addEventListener('touchmove', (e) => { 
             this.mouse.x = e.touches[0].clientX; 
             this.mouse.y = e.touches[0].clientY - 100; 
             e.preventDefault(); 
@@ -75,22 +99,7 @@ class GameEngine {
             this.mouse.isDown = false; 
         });
 
-        window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && this.isRunning && !this.isPaused && !this.isCountingDown) {
-                this.activatePlayerAbility();
-            }
-
-            if (e.key === 'Escape' && this.isRunning && !this.isCountingDown && document.getElementById('upgradeScreen').classList.contains('hidden')) {
-                this.togglePause();
-            }
-            
-            if (this.isPaused && !document.getElementById('upgradeScreen').classList.contains('hidden')) {
-                if (e.key === '1' && this.currentChoices.length >= 1) this.selectUpgrade(0);
-                if (e.key === '2' && this.currentChoices.length >= 2) this.selectUpgrade(1);
-                if (e.key === '3' && this.currentChoices.length >= 3) this.selectUpgrade(2);
-            }
-        });
-        
+        // UI Buttons
         document.getElementById('btnStandard').addEventListener('click', () => this.start('standard'));
         document.getElementById('btnHardcore').addEventListener('click', () => this.start('hardcore'));
         document.getElementById('restartBtn').addEventListener('click', () => this.start(this.currentMode));
@@ -102,69 +111,65 @@ class GameEngine {
         const skinButtons = document.querySelectorAll('.skin-btn');
         skinButtons.forEach(btn => {
             btn.addEventListener('click', (e) => {
-                skinButtons.forEach(b => {
+                skinButtons.forEach(b => { 
                     b.classList.remove(b.dataset.color); 
                     b.classList.add('border-transparent'); 
                     b.classList.remove('shadow-[0_0_15px_rgba(6,182,212,0.6)]'); 
                 });
-                const clicked = e.currentTarget;
+                
+                const clicked = e.currentTarget; 
                 clicked.classList.remove('border-transparent'); 
-                clicked.classList.add(clicked.dataset.color);
+                clicked.classList.add(clicked.dataset.color); 
                 this.currentSkin = parseInt(clicked.dataset.skin);
             });
         });
     }
 
-    getAbilityMaxCooldown(skinId) {
+    getAbilityMaxCooldown(skinId) { 
         const cooldowns = [10000, 15000, 12000, 12000, 20000]; 
-        return cooldowns[skinId] || 10000;
+        return cooldowns[skinId] || 10000; 
     }
-
-    getAbilityName(skinId) {
-        const names = ["EMP Blast", "Ghost Protocol", "Wing-Sweep", "Missile Volley", "Phase-Shift"];
-        return names[skinId] || "Ability";
+    
+    getAbilityName(skinId) { 
+        const names = ["EMP Blast", "Ghost Protocol", "Wing-Sweep", "Missile Volley", "Phase-Shift"]; 
+        return names[skinId] || "Ability"; 
     }
 
     activatePlayerAbility() {
         if (this.player.abilityTimer > 0 || !this.isRunning) return;
-
+        
         this.player.abilityTimer = this.getAbilityMaxCooldown(this.player.skinId);
         
         switch(this.player.skinId) {
-            case 0: // Vanguard
-                this.spawnParticles(this.player.x, this.player.y, 40, '#06b6d4', 5);
-                this.projectiles = this.projectiles.filter(p => !p.isEnemy || MathUtils.distance(this.player.x, this.player.y, p.x, p.y) > 250);
-                this.triggerShake(5);
+            case 0: 
+                this.spawnParticles(this.player.x, this.player.y, 40, '#06b6d4', 5); 
+                this.projectiles = this.projectiles.filter(p => !p.isEnemy || MathUtils.distance(this.player.x, this.player.y, p.x, p.y) > 250); 
+                this.triggerShake(5); 
                 break;
-            case 1: // F-47
-                this.player.activeAbilityTime = 3000;
-                this.player.isGhost = true;
-                this.player.invulnerableTimer = 3000;
-                this.spawnParticles(this.player.x, this.player.y, 20, '#ef4444', 2);
+            case 1: 
+                this.player.activeAbilityTime = 3000; 
+                this.player.isGhost = true; 
+                this.player.invulnerableTimer = 3000; 
+                this.spawnParticles(this.player.x, this.player.y, 20, '#ef4444', 2); 
                 break;
-            case 2: // F-14
-                this.player.activeAbilityTime = 5000;
-                this.player.isWingSweepActive = true;
-                this.spawnParticles(this.player.x, this.player.y, 15, '#3b82f6', 2);
+            case 2: 
+                this.player.activeAbilityTime = 5000; 
+                this.player.isWingSweepActive = true; 
+                this.spawnParticles(this.player.x, this.player.y, 15, '#3b82f6', 2); 
                 break;
-            case 3: // F-15 (HOMING ROCKETS)
-                this.spawnParticles(this.player.x, this.player.y, 20, '#f97316', 3);
-                
-                // Spawn 8 Homing Missiles in a frontal fan
-                for(let i=0; i<8; i++) {
-                    // Spread forward in a 180 degree cone
+            case 3: 
+                this.spawnParticles(this.player.x, this.player.y, 20, '#f97316', 3); 
+                for(let i=0; i<8; i++) { 
                     const spread = (Math.random() - 0.5) * Math.PI; 
-                    const angle = this.player.angle + spread;
-                    
-                    // High damage (4x base), slightly slower speed, homing enabled
-                    const rocket = new Projectile(this.player.x, this.player.y, angle, CONFIG.PROJECTILE_SPEED * 0.8, this.player.stats.damage * 4, '#f97316', false, false, true);
-                    this.projectiles.push(rocket);
-                }
-                this.triggerShake(8);
+                    const angle = this.player.angle + spread; 
+                    const rocket = new Projectile(this.player.x, this.player.y, angle, CONFIG.PROJECTILE_SPEED * 0.8, this.player.stats.damage * 4, '#f97316', false, false, true); 
+                    this.projectiles.push(rocket); 
+                } 
+                this.triggerShake(8); 
                 break;
-            case 4: // SR-71
-                this.timeSlowActive = 4000;
-                this.spawnParticles(this.player.x, this.player.y, 30, '#a855f7', 1);
+            case 4: 
+                this.timeSlowActive = 4000; 
+                this.spawnParticles(this.player.x, this.player.y, 30, '#a855f7', 1); 
                 break;
         }
     }
@@ -177,14 +182,24 @@ class GameEngine {
         
         cooldownBar.style.width = `${progress * 100}%`;
         
-        if (this.player.abilityTimer > 0) {
-            abilityName.innerText = "RECHARGING...";
-            abilityName.style.color = '#6b7280';
-            cooldownBar.style.backgroundColor = '#6b7280';
+        if (this.player.abilityTimer > 0) { 
+            abilityName.innerText = "RECHARGING..."; 
+            abilityName.style.color = '#6b7280'; 
+            cooldownBar.style.backgroundColor = '#6b7280'; 
+        } else { 
+            abilityName.innerText = `${this.getAbilityName(this.player.skinId)} READY`; 
+            abilityName.style.color = '#eab308'; 
+            cooldownBar.style.backgroundColor = '#eab308'; 
+        }
+
+        const shieldCountdownPanel = document.getElementById('shieldCountdownPanel');
+        const shieldCountdownTime = document.getElementById('shieldCountdownTime');
+        
+        if (this.player.invulnerableTimer > 0 && !this.player.isGhost) {
+            shieldCountdownPanel.classList.remove('hidden');
+            shieldCountdownTime.innerText = Math.ceil(this.player.invulnerableTimer / 1000) + 's';
         } else {
-            abilityName.innerText = `${this.getAbilityName(this.player.skinId)} READY`;
-            abilityName.style.color = '#eab308';
-            cooldownBar.style.backgroundColor = '#eab308';
+            shieldCountdownPanel.classList.add('hidden');
         }
     }
     
@@ -193,89 +208,91 @@ class GameEngine {
         this.canvas.height = window.innerHeight; 
     }
     
-    togglePause() {
-        if (this.isPaused) {
-            this.resumeWithCountdown();
+    togglePause() { 
+        if (this.isPaused) { 
+            this.resumeWithCountdown(); 
         } else { 
             this.isPaused = true; 
             document.getElementById('pauseScreen').classList.remove('hidden'); 
-        }
+        } 
     }
-
+    
     resumeWithCountdown() {
-        document.getElementById('pauseScreen').classList.add('hidden');
+        document.getElementById('pauseScreen').classList.add('hidden'); 
         this.isCountingDown = true;
         
-        const cdScreen = document.getElementById('countdownScreen');
+        const cdScreen = document.getElementById('countdownScreen'); 
         const cdText = document.getElementById('countdownText');
         
-        cdScreen.classList.remove('hidden');
+        cdScreen.classList.remove('hidden'); 
         this.mouse.x = this.player.x; 
         this.mouse.y = this.player.y;
         
         let count = 2; 
         cdText.innerText = count;
-
-        const interval = setInterval(() => {
-            count--;
+        
+        const interval = setInterval(() => { 
+            count--; 
             if (count > 0) {
-                cdText.innerText = count;
+                cdText.innerText = count; 
             } else if (count === 0) {
-                cdText.innerText = 'GO!';
-            } else {
+                cdText.innerText = 'GO!'; 
+            } else { 
                 clearInterval(interval); 
                 cdScreen.classList.add('hidden'); 
                 this.isCountingDown = false; 
-                this.isPaused = false;
+                this.isPaused = false; 
                 
                 requestAnimationFrame((time) => { 
                     this.lastTime = time; 
                     this.loop(time); 
-                });
-            }
+                }); 
+            } 
         }, 800); 
     }
-
-    goHome() {
-        this.isRunning = false;
+    
+    goHome() { 
+        this.isRunning = false; 
         document.getElementById('gameOverScreen').classList.add('hidden'); 
-        document.getElementById('pauseScreen').classList.add('hidden');
+        document.getElementById('pauseScreen').classList.add('hidden'); 
         document.getElementById('hud').classList.add('hidden'); 
-        document.getElementById('mainMenu').classList.remove('hidden');
+        document.getElementById('mainMenu').classList.remove('hidden'); 
         
         this.ctx.fillStyle = '#0f172a'; 
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height); 
     }
     
-    start(mode = 'standard') {
-        this.currentMode = mode;
-        
+    start(mode = 'standard') { 
+        this.currentMode = mode; 
         document.getElementById('mainMenu').classList.add('hidden'); 
-        document.getElementById('gameOverScreen').classList.add('hidden');
+        document.getElementById('gameOverScreen').classList.add('hidden'); 
         document.getElementById('upgradeScreen').classList.add('hidden'); 
         document.getElementById('pauseScreen').classList.add('hidden'); 
-        document.getElementById('hud').classList.remove('hidden');
+        document.getElementById('hud').classList.remove('hidden'); 
         
-        this.player = new Player(this.canvas.width / 2, this.canvas.height / 2, this.currentSkin);
+        this.player = new Player(this.canvas.width / 2, this.canvas.height / 2, this.currentSkin); 
         
         if (mode === 'hardcore') { 
             this.player.health = 1; 
             this.player.maxHealth = 1; 
-        }
+        } 
         
         this.mouse.x = this.canvas.width / 2; 
         this.mouse.y = this.canvas.height / 2;
-
+        
         this.projectiles = []; 
         this.particles = []; 
         this.enemies = []; 
         this.gems = []; 
+        this.powerups = []; 
         this.floatingTexts = [];
         
         this.score = 0; 
         this.level = 1; 
         this.xp = 0; 
         this.xpToNextLevel = 20; 
+        this.powerUpTimer = 15000; 
+        
         this.updateHUD();
         
         this.isRunning = true; 
@@ -290,313 +307,348 @@ class GameEngine {
             this.loop(time); 
         });
     }
-
+    
     triggerShake(amount) { 
         this.shakeAmount = Math.max(this.shakeAmount, amount); 
     }
     
-    spawnParticles(x, y, count, color, speedScale = 1) {
-        for(let i=0; i < count; i++) {
+    spawnParticles(x, y, count, color, speedScale = 1) { 
+        for(let i=0; i < count; i++) { 
             const angle = Math.random() * Math.PI * 2; 
-            const speed = Math.random() * 4 * speedScale;
-            this.particles.push(new Particle(
-                x, y, 
-                Math.cos(angle) * speed, Math.sin(angle) * speed, 
-                Math.random() * 3 + 1, color, Math.random() * 20 + 20, true
-            ));
-        }
+            const speed = Math.random() * 4 * speedScale; 
+            this.particles.push(new Particle(x, y, Math.cos(angle) * speed, Math.sin(angle) * speed, Math.random() * 3 + 1, color, Math.random() * 20 + 20, true)); 
+        } 
     }
-
-    damagePlayer(amount) {
+    
+    damagePlayer(amount) { 
         if (!this.isRunning) return; 
+        
         this.player.health -= amount; 
-        this.triggerShake(10);
+        this.triggerShake(10); 
         
         const overlay = document.getElementById('damageOverlay'); 
         overlay.style.opacity = '0.4'; 
-        setTimeout(() => overlay.style.opacity = '0', 100);
+        setTimeout(() => overlay.style.opacity = '0', 100); 
         
-        document.getElementById('healthBar').style.width = `${Math.max(0, (this.player.health / this.player.maxHealth) * 100)}%`;
+        document.getElementById('healthBar').style.width = `${Math.max(0, (this.player.health / this.player.maxHealth) * 100)}%`; 
         
         if (this.player.health <= 0) {
             this.gameOver();
-        }
+        } 
     }
-
-    gainXP(amount) {
+    
+    gainXP(amount) { 
         if (!this.isRunning) return; 
         
-        if (this.currentMode === 'hardcore') {
-            amount *= 2;
-        }
+        if (this.currentMode === 'hardcore') { 
+            amount *= 2; 
+        } 
         
-        this.xp += amount;
+        this.xp += amount; 
+        
         if (this.xp >= this.xpToNextLevel) { 
             this.xp -= this.xpToNextLevel; 
             this.levelUp(); 
-        }
-        document.getElementById('xpBar').style.width = `${(this.xp / this.xpToNextLevel) * 100}%`;
+        } 
+        
+        document.getElementById('xpBar').style.width = `${(this.xp / this.xpToNextLevel) * 100}%`; 
     }
-
-    levelUp() {
+    
+    levelUp() { 
         if (!this.isRunning) return; 
         
         this.level++; 
         this.xpToNextLevel = Math.floor(this.xpToNextLevel * 1.5); 
-        document.getElementById('levelDisplay').innerText = this.level;
+        document.getElementById('levelDisplay').innerText = this.level; 
         
         this.isPaused = true; 
+        
         const upgradeScreen = document.getElementById('upgradeScreen'); 
-        const container = document.getElementById('upgradeCards');
+        const container = document.getElementById('upgradeCards'); 
         container.innerHTML = ''; 
         
-        this.currentChoices = this.upgrades.getUpgrades(this.currentMode);
+        this.currentChoices = this.upgrades.getUpgrades(this.currentMode); 
         
-        this.currentChoices.forEach((choice, index) => {
+        this.currentChoices.forEach((choice, index) => { 
             const card = document.createElement('div'); 
-            card.className = 'upgrade-card p-6 rounded-lg text-center relative';
+            card.className = 'upgrade-card p-6 rounded-lg text-center relative'; 
             card.innerHTML = `
                 <div class="absolute top-2 left-2 bg-gray-800 text-gray-400 font-mono text-xs px-2 py-1 rounded border border-gray-600">[${index + 1}]</div>
                 <h3 class="text-xl font-bold mb-2 ${choice.color}">${choice.title}</h3>
                 <p class="text-sm text-gray-300">${choice.desc}</p>
-            `;
+            `; 
             card.onclick = () => this.selectUpgrade(index); 
-            container.appendChild(card);
-        });
+            container.appendChild(card); 
+        }); 
         
-        upgradeScreen.classList.remove('hidden');
+        upgradeScreen.classList.remove('hidden'); 
     }
-
-    selectUpgrade(index) {
+    
+    selectUpgrade(index) { 
         const choice = this.currentChoices[index]; 
-        if (!choice) return;
+        if (!choice) return; 
         
-        this.upgrades.applyUpgrade(choice.id, this.player);
+        this.upgrades.applyUpgrade(choice.id, this.player); 
         
         document.getElementById('upgradeScreen').classList.add('hidden'); 
-        this.isPaused = false;
+        this.isPaused = false; 
         this.mouse.x = this.player.x; 
         this.mouse.y = this.player.y; 
-        
         this.slowMoTimer = 3000; 
-        this.player.invulnerableTimer = 2000;
+        this.player.invulnerableTimer = 2000; 
         
         requestAnimationFrame((time) => { 
             this.lastTime = time; 
             this.loop(time); 
-        });
+        }); 
     }
-
-    updateHUD() {
+    
+    updateHUD() { 
         document.getElementById('scoreDisplay').innerText = this.score; 
-        document.getElementById('levelDisplay').innerText = this.level;
+        document.getElementById('levelDisplay').innerText = this.level; 
         document.getElementById('xpBar').style.width = `${(this.xp / this.xpToNextLevel) * 100}%`; 
-        document.getElementById('healthBar').style.width = `${(this.player.health / this.player.maxHealth) * 100}%`;
+        document.getElementById('healthBar').style.width = `${(this.player.health / this.player.maxHealth) * 100}%`; 
     }
-
-    gameOver() {
+    
+    gameOver() { 
         this.isRunning = false; 
         document.getElementById('hud').classList.add('hidden'); 
-        document.getElementById('gameOverScreen').classList.remove('hidden');
+        document.getElementById('gameOverScreen').classList.remove('hidden'); 
         
         const timeAlive = Math.floor(this.gameTime / 1000); 
         const mins = String(Math.floor(timeAlive / 60)).padStart(2, '0'); 
-        const secs = String(timeAlive % 60).padStart(2, '0');
+        const secs = String(timeAlive % 60).padStart(2, '0'); 
         
         document.getElementById('finalTime').innerText = `${mins}:${secs}`; 
-        document.getElementById('finalScore').innerText = this.score;
+        document.getElementById('finalScore').innerText = this.score; 
     }
     
-    loop(currentTime) {
-        if (!this.isRunning || this.isPaused || this.isCountingDown) return;
+    loop(currentTime) { 
+        if (!this.isRunning || this.isPaused || this.isCountingDown) return; 
         
         const dt = (currentTime - this.lastTime) / 1000; 
-        this.lastTime = currentTime;
+        this.lastTime = currentTime; 
         
         this.update(dt); 
-        this.draw();
+        this.draw(); 
         
-        requestAnimationFrame((time) => this.loop(time));
+        requestAnimationFrame((time) => this.loop(time)); 
     }
     
     update(dt) {
         let gameDt = dt; 
         let enemyDt = dt;
         
-        // When Level Up upgrade is selected, slow down enemies/game time, but NOT player
         if (this.slowMoTimer > 0) { 
             this.slowMoTimer -= dt * 1000; 
             gameDt = dt * 0.15; 
             enemyDt = gameDt; 
         }
         
-        if (this.timeSlowActive > 0) {
-            this.timeSlowActive -= dt * 1000;
+        if (this.timeSlowActive > 0) { 
+            this.timeSlowActive -= dt * 1000; 
             enemyDt = dt * 0.1; 
         }
-
+        
         this.gameTime += gameDt * 1000;
         
         const seconds = Math.floor(this.gameTime / 1000); 
         const mins = String(Math.floor(seconds / 60)).padStart(2, '0'); 
-        const secs = String(seconds % 60).padStart(2, '0');
+        const secs = String(seconds % 60).padStart(2, '0'); 
+        
         document.getElementById('timeDisplay').innerText = `${mins}:${secs}`;
-
-        this.updateAbilityHUD();
+        this.updateAbilityHUD(); 
         this.spawner.update(enemyDt, this.gameTime, this);
         
-        const shouldStopToShoot = this.mouse.isDown && !this.isTouch;
+        this.powerUpTimer -= gameDt * 1000;
         
-        // FIX: Player now always uses real 'dt' instead of 'gameDt', so speed is 100% normal during slow-mo!
+        if (this.powerUpTimer <= 0) { 
+            this.powerUpTimer = Math.random() * 15000 + 15000; 
+            const type = Math.random() < 0.5 ? 'magnet' : 'shield'; 
+            const px = Math.random() * (this.canvas.width - 200) + 100; 
+            const py = Math.random() * (this.canvas.height - 200) + 100; 
+            this.powerups.push(new PowerUp(px, py, type)); 
+        }
+        
+        for (let i = this.powerups.length - 1; i >= 0; i--) { 
+            const p = this.powerups[i]; 
+            p.update(gameDt); 
+            
+            if (MathUtils.distance(p.x, p.y, this.player.x, this.player.y) < p.radius + this.player.radius) { 
+                if (p.type === 'shield') { 
+                    this.player.invulnerableTimer = 4000; 
+                    this.player.hasShieldPowerup = true; // TRIGGER THE VISUAL HERE
+                    this.spawnParticles(this.player.x, this.player.y, 40, '#0ea5e9', 3); 
+                    this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 30, "SHIELD ACTIVE", '#0ea5e9', true)); 
+                } else if (p.type === 'magnet') { 
+                    this.gems.forEach(g => g.magnetized = true); 
+                    this.spawnParticles(this.player.x, this.player.y, 40, '#ef4444', 3); 
+                    this.floatingTexts.push(new FloatingText(this.player.x, this.player.y - 30, "MAGNET XP", '#ef4444', true)); 
+                } 
+                p.markedForDeletion = true; 
+            } 
+            
+            if (p.markedForDeletion) { 
+                this.powerups.splice(i, 1); 
+            } 
+        }
+        
+        const shouldStopToShoot = this.mouse.isDown && !this.isTouch; 
         this.player.update(this.mouse.x, this.mouse.y, dt, shouldStopToShoot);
         
-        let currentFireRate = this.player.stats.fireRate;
-        if (this.player.isWingSweepActive) {
+        let currentFireRate = this.player.stats.fireRate; 
+        
+        if (this.player.isWingSweepActive) { 
             currentFireRate *= 0.5; 
         }
-
-        // We use real 'dt' gameTime for firing so you don't fire ultra-slowly during a level up
-        if (this.mouse.isDown && this.gameTime - this.player.lastShotTime > currentFireRate) {
-            const spread = 0.15;
-            const startAngle = this.player.angle - (spread * (this.player.stats.multiShot - 1)) / 2;
-            const currentProjSpeed = this.slowMoTimer > 0 ? CONFIG.PROJECTILE_SPEED * 1.8 : CONFIG.PROJECTILE_SPEED;
-
-            for(let i = 0; i < this.player.stats.multiShot; i++) {
-                const angle = startAngle + (i * spread);
+        
+        if (this.mouse.isDown && this.gameTime - this.player.lastShotTime > currentFireRate) { 
+            const spread = 0.15; 
+            const startAngle = this.player.angle - (spread * (this.player.stats.multiShot - 1)) / 2; 
+            const currentProjSpeed = this.slowMoTimer > 0 ? CONFIG.PROJECTILE_SPEED * 1.8 : CONFIG.PROJECTILE_SPEED; 
+            
+            for(let i = 0; i < this.player.stats.multiShot; i++) { 
+                const angle = startAngle + (i * spread); 
                 const tipX = this.player.x + Math.cos(this.player.angle) * 15; 
-                const tipY = this.player.y + Math.sin(this.player.angle) * 15;
-                const isCrit = Math.random() < this.player.stats.critChance;
-                const finalDamage = isCrit ? this.player.stats.damage * 2 : this.player.stats.damage;
+                const tipY = this.player.y + Math.sin(this.player.angle) * 15; 
+                const isCrit = Math.random() < this.player.stats.critChance; 
+                const finalDamage = isCrit ? this.player.stats.damage * 2 : this.player.stats.damage; 
                 
-                let bulletColor = isCrit ? '#a855f7' : CONFIG.COLORS.projectile;
-                if (this.player.isWingSweepActive) {
+                let bulletColor = isCrit ? '#a855f7' : CONFIG.COLORS.projectile; 
+                
+                if (this.player.isWingSweepActive) { 
                     bulletColor = '#3b82f6'; 
-                }
+                } 
                 
-                const p = new Projectile(tipX, tipY, angle, currentProjSpeed, finalDamage, bulletColor, false, this.player.isWingSweepActive, false);
-                p.isCrit = isCrit;
-                this.projectiles.push(p);
-            }
-            this.player.lastShotTime = this.gameTime;
-            this.triggerShake(this.player.isWingSweepActive ? 3 : 1.5);
+                const p = new Projectile(tipX, tipY, angle, currentProjSpeed, finalDamage, bulletColor, false, this.player.isWingSweepActive, false); 
+                p.isCrit = isCrit; 
+                this.projectiles.push(p); 
+            } 
+            
+            this.player.lastShotTime = this.gameTime; 
+            this.triggerShake(this.player.isWingSweepActive ? 3 : 1.5); 
         }
-
-        for (let i = this.projectiles.length - 1; i >= 0; i--) {
-            const p = this.projectiles[i];
+        
+        for (let i = this.projectiles.length - 1; i >= 0; i--) { 
+            const p = this.projectiles[i]; 
+            p.update(p.isEnemy ? enemyDt : gameDt, this.enemies); 
             
-            // Pass enemies array so homing missiles can track them
-            p.update(p.isEnemy ? enemyDt : gameDt, this.enemies);
-            
-            if (p.x < 0 || p.x > this.canvas.width || p.y < 0 || p.y > this.canvas.height || p.markedForDeletion) {
+            if (p.x < 0 || p.x > this.canvas.width || p.y < 0 || p.y > this.canvas.height || p.markedForDeletion) { 
                 this.projectiles.splice(i, 1); 
-                continue;
-            }
-
-            if (p.isEnemy) {
-                if (MathUtils.distance(p.x, p.y, this.player.x, this.player.y) < p.radius + this.player.radius) {
-                    if (this.player.invulnerableTimer <= 0 && !this.player.isGhost) {
-                        this.damagePlayer(p.damage);
-                    }
+                continue; 
+            } 
+            
+            if (p.isEnemy) { 
+                if (MathUtils.distance(p.x, p.y, this.player.x, this.player.y) < p.radius + this.player.radius) { 
+                    if (this.player.invulnerableTimer <= 0 && !this.player.isGhost) { 
+                        this.damagePlayer(p.damage); 
+                    } 
                     p.markedForDeletion = true; 
-                    this.spawnParticles(p.x, p.y, 5, p.color, 0.5);
-                }
-            } else {
-                for (let j = this.enemies.length - 1; j >= 0; j--) {
-                    const e = this.enemies[j];
-                    if (MathUtils.distance(p.x, p.y, e.x, e.y) < p.radius + e.radius) {
-                        let isProtected = false;
-                        if (e.type !== 'shield') {
-                            isProtected = this.enemies.some(drone => drone.type === 'shield' && !drone.markedForDeletion && MathUtils.distance(e.x, e.y, drone.x, drone.y) <= 60);
-                        }
-
-                        if (isProtected) {
+                    this.spawnParticles(p.x, p.y, 5, p.color, 0.5); 
+                } 
+            } else { 
+                for (let j = this.enemies.length - 1; j >= 0; j--) { 
+                    const e = this.enemies[j]; 
+                    if (MathUtils.distance(p.x, p.y, e.x, e.y) < p.radius + e.radius) { 
+                        let isProtected = false; 
+                        
+                        if (e.type !== 'shield') { 
+                            isProtected = this.enemies.some(drone => drone.type === 'shield' && !drone.markedForDeletion && MathUtils.distance(e.x, e.y, drone.x, drone.y) <= 60); 
+                        } 
+                        
+                        if (isProtected) { 
                             p.markedForDeletion = true; 
                             this.spawnParticles(p.x, p.y, 3, '#2dd4bf', 0.5); 
-                            this.floatingTexts.push(new FloatingText(e.x, e.y - 15, "BLOCKED", '#2dd4bf', false));
-                        } else {
-                            e.takeDamage(p.damage);
-                            if (!p.isPiercing) {
-                                p.markedForDeletion = true;
-                            }
+                            this.floatingTexts.push(new FloatingText(e.x, e.y - 15, "BLOCKED", '#2dd4bf', false)); 
+                        } else { 
+                            e.takeDamage(p.damage); 
+                            if (!p.isPiercing) { 
+                                p.markedForDeletion = true; 
+                            } 
                             this.spawnParticles(p.x, p.y, 5, p.color, 0.5); 
-                            const textColor = p.isCrit ? '#a855f7' : '#ffffff';
-                            this.floatingTexts.push(new FloatingText(e.x, e.y - 15, Math.floor(p.damage), textColor, p.isCrit));
-                        }
-                        break;
-                    }
-                }
-            }
+                            const textColor = p.isCrit ? '#a855f7' : '#ffffff'; 
+                            this.floatingTexts.push(new FloatingText(e.x, e.y - 15, Math.floor(p.damage), textColor, p.isCrit)); 
+                        } 
+                        break; 
+                    } 
+                } 
+            } 
         }
-
-        const activeEnemyBullets = this.projectiles.filter(p => p.isEnemy).length;
-
-        for (let i = this.enemies.length - 1; i >= 0; i--) {
-            const e = this.enemies[i];
-            e.update(this.player.x, this.player.y, enemyDt, this.enemies, this.player.isGhost);
+        
+        const activeEnemyBullets = this.projectiles.filter(p => p.isEnemy).length; 
+        
+        for (let i = this.enemies.length - 1; i >= 0; i--) { 
+            const e = this.enemies[i]; 
+            e.update(this.player.x, this.player.y, enemyDt, this.enemies, this.player.isGhost); 
             
-            if (e.type === 'shooter') {
-                if (!e.isCharging && this.gameTime - e.lastShotTime > e.fireRate) {
-                    if (activeEnemyBullets < 30 && !this.player.isGhost) {
+            if (e.type === 'shooter') { 
+                if (!e.isCharging && this.gameTime - e.lastShotTime > e.fireRate) { 
+                    if (activeEnemyBullets < 30 && !this.player.isGhost) { 
                         e.isCharging = true; 
                         e.chargeProgress = 0; 
                         e.chargeStartTime = this.gameTime; 
                         e.fireRate = 3000 + Math.random() * 1000; 
-                    }
-                }
-
-                if (e.isCharging) {
+                    } 
+                } 
+                
+                if (e.isCharging) { 
                     let chargeTime = this.gameTime - e.chargeStartTime; 
                     e.chargeProgress = Math.min(1, chargeTime / 1000); 
+                    
                     if (chargeTime >= 1000) { 
-                        const angleToPlayer = MathUtils.angle(e.x, e.y, this.player.x, this.player.y);
-                        this.projectiles.push(new Projectile(e.x, e.y, angleToPlayer, 3.5, 15, '#ef4444', true, false, false));
+                        const angleToPlayer = MathUtils.angle(e.x, e.y, this.player.x, this.player.y); 
+                        this.projectiles.push(new Projectile(e.x, e.y, angleToPlayer, 3.5, 15, '#ef4444', true, false, false)); 
                         e.lastShotTime = this.gameTime; 
                         e.isCharging = false; 
-                        e.chargeProgress = 0;
-                    }
-                }
-            }
+                        e.chargeProgress = 0; 
+                    } 
+                } 
+            } 
             
-            if (MathUtils.distance(e.x, e.y, this.player.x, this.player.y) < e.radius + this.player.radius) {
-                if (this.player.invulnerableTimer <= 0 && !this.player.isGhost) {
-                    this.damagePlayer(15);
+            if (MathUtils.distance(e.x, e.y, this.player.x, this.player.y) < e.radius + this.player.radius) { 
+                if (this.player.invulnerableTimer <= 0 && !this.player.isGhost) { 
+                    this.damagePlayer(15); 
                     e.markedForDeletion = true; 
-                }
-            }
-
-            if (e.markedForDeletion) {
+                } 
+            } 
+            
+            if (e.markedForDeletion) { 
                 this.spawnParticles(e.x, e.y, 15, e.color, 2); 
                 this.triggerShake(3); 
-                this.score += 10;
-                document.getElementById('scoreDisplay').innerText = this.score;
+                this.score += 10; 
+                document.getElementById('scoreDisplay').innerText = this.score; 
                 this.gems.push(new XPGem(e.x, e.y, e.xpValue)); 
-                this.enemies.splice(i, 1);
-            }
+                this.enemies.splice(i, 1); 
+            } 
         }
-
-        for (let i = this.gems.length - 1; i >= 0; i--) {
+        
+        for (let i = this.gems.length - 1; i >= 0; i--) { 
             const g = this.gems[i]; 
             g.update(this.player.x, this.player.y, gameDt); 
-            if (MathUtils.distance(g.x, g.y, this.player.x, this.player.y) < g.radius + this.player.radius) {
+            
+            if (MathUtils.distance(g.x, g.y, this.player.x, this.player.y) < g.radius + this.player.radius) { 
                 this.gainXP(g.value); 
                 this.spawnParticles(g.x, g.y, 3, g.color, 0.3); 
-                this.gems.splice(i, 1);
-            }
+                this.gems.splice(i, 1); 
+            } 
         }
-
+        
         this.floatingTexts = this.floatingTexts.filter(t => { 
             t.update(gameDt); 
             return t.alpha > 0; 
-        });
+        }); 
         
         this.particles = this.particles.filter(p => { 
             p.update(gameDt); 
             return p.alpha > 0; 
-        });
+        }); 
         
         if (this.shakeAmount > 0) { 
             this.shakeAmount *= 0.9; 
-            if (this.shakeAmount < 0.1) this.shakeAmount = 0; 
+            
+            if (this.shakeAmount < 0.1) {
+                this.shakeAmount = 0; 
+            }
         }
     }
     
@@ -605,48 +657,49 @@ class GameEngine {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
         
         this.ctx.save();
-        if (this.shakeAmount > 0) {
+        
+        if (this.shakeAmount > 0) { 
             const dx = (Math.random() - 0.5) * this.shakeAmount; 
             const dy = (Math.random() - 0.5) * this.shakeAmount; 
-            this.ctx.translate(dx, dy);
+            this.ctx.translate(dx, dy); 
         }
         
-        this.gems.forEach(g => g.draw(this.ctx));
-        this.particles.forEach(p => p.draw(this.ctx));
-        this.enemies.forEach(e => e.draw(this.ctx));
-        this.projectiles.forEach(p => p.draw(this.ctx));
-        this.player.draw(this.ctx);
+        this.powerups.forEach(p => p.draw(this.ctx)); 
+        this.gems.forEach(g => g.draw(this.ctx)); 
+        this.particles.forEach(p => p.draw(this.ctx)); 
+        this.enemies.forEach(e => e.draw(this.ctx)); 
+        this.projectiles.forEach(p => p.draw(this.ctx)); 
+        this.player.draw(this.ctx); 
         this.floatingTexts.forEach(t => t.draw(this.ctx));
         
-        if (this.slowMoTimer > 0) {
+        if (this.slowMoTimer > 0) { 
             this.ctx.fillStyle = 'rgba(6, 182, 212, 0.05)'; 
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height); 
             this.ctx.font = 'bold 20px Rajdhani'; 
-            this.ctx.fillStyle = `rgba(6, 182, 212, ${Math.min(1, this.slowMoTimer / 1000)})`;
+            this.ctx.fillStyle = `rgba(6, 182, 212, ${Math.min(1, this.slowMoTimer / 1000)})`; 
             this.ctx.textAlign = 'center'; 
-            this.ctx.fillText("TACTICAL OVERDRIVE", this.player.x, this.player.y + 45);
+            this.ctx.fillText("TACTICAL OVERDRIVE", this.player.x, this.player.y + 45); 
         }
-
-        if (this.timeSlowActive > 0) {
+        
+        if (this.timeSlowActive > 0) { 
             this.ctx.fillStyle = 'rgba(168, 85, 247, 0.08)'; 
-            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height); 
             this.ctx.font = 'bold 24px Rajdhani'; 
-            this.ctx.fillStyle = `rgba(168, 85, 247, ${Math.min(1, this.timeSlowActive / 1000)})`;
+            this.ctx.fillStyle = `rgba(168, 85, 247, ${Math.min(1, this.timeSlowActive / 1000)})`; 
             this.ctx.textAlign = 'center'; 
-            this.ctx.fillText("PHASE SHIFT ACTIVE", this.player.x, this.player.y + 45);
+            this.ctx.fillText("PHASE SHIFT ACTIVE", this.player.x, this.player.y + 45); 
         }
         
         this.ctx.restore();
     }
 }
 
-// SAFE INITIALIZATION
-function loadGame() {
-    window.game = new GameEngine();
+function loadGame() { 
+    window.game = new GameEngine(); 
 }
 
 if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadGame);
+    document.addEventListener('DOMContentLoaded', loadGame); 
 } else {
     loadGame();
 }

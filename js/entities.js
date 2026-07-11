@@ -27,17 +27,102 @@ export class Particle {
         ctx.beginPath(); 
         ctx.arc(this.x, this.y, Math.max(0, this.radius), 0, Math.PI * 2);
         ctx.fillStyle = this.color;
+        
         if (this.glow) { 
             ctx.shadowBlur = 10; 
             ctx.shadowColor = this.color; 
         }
+        
         ctx.fill(); 
         ctx.restore();
     }
 }
 
+export class PowerUp {
+    constructor(x, y, type) {
+        this.x = x; 
+        this.y = y; 
+        this.type = type;
+        this.lifeTime = 3000; 
+        this.markedForDeletion = false;
+        this.radius = 24; 
+        this.pulse = Math.random() * Math.PI * 2;
+    }
+
+    update(dt) {
+        this.lifeTime -= dt * 1000;
+        if (this.lifeTime <= 0) {
+            this.markedForDeletion = true;
+        }
+        this.pulse += dt * 4;
+    }
+
+    draw(ctx) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+
+        if (this.lifeTime < 1000) {
+            ctx.globalAlpha = Math.floor(Date.now() / 100) % 2 === 0 ? 0.3 : 1;
+        }
+
+        const scale = 1 + Math.sin(this.pulse) * 0.15;
+        ctx.scale(scale, scale);
+        ctx.shadowBlur = 30; 
+
+        if (this.type === 'shield') {
+            ctx.shadowColor = '#0ea5e9';
+            
+            ctx.beginPath();
+            ctx.moveTo(0, -18); 
+            ctx.lineTo(15, -12); 
+            ctx.lineTo(15, 3);  
+            ctx.bezierCurveTo(15, 15, 6, 21, 0, 24); 
+            ctx.bezierCurveTo(-6, 21, -15, 15, -15, 3); 
+            ctx.lineTo(-15, -12); 
+            ctx.closePath();
+            
+            ctx.fillStyle = 'rgba(14, 165, 233, 0.2)'; 
+            ctx.fill();
+            ctx.lineWidth = 3; 
+            ctx.strokeStyle = '#0ea5e9'; 
+            ctx.stroke();
+
+            ctx.beginPath();
+            ctx.moveTo(0, -9); 
+            ctx.lineTo(0, 12);
+            ctx.moveTo(-7, 2); 
+            ctx.lineTo(7, 2);
+            ctx.lineWidth = 3; 
+            ctx.strokeStyle = '#ffffff'; 
+            ctx.stroke();
+
+        } else if (this.type === 'magnet') {
+            ctx.shadowColor = '#ef4444';
+            ctx.rotate(Math.PI / 4); 
+            
+            ctx.beginPath();
+            ctx.arc(0, -3, 12, Math.PI, 0); 
+            ctx.lineTo(12, 13); 
+            ctx.lineTo(4, 13); 
+            ctx.lineTo(4, -3);
+            ctx.arc(0, -3, 4, 0, Math.PI, true); 
+            ctx.lineTo(-4, 13); 
+            ctx.lineTo(-12, 13);
+            ctx.closePath();
+            
+            ctx.fillStyle = '#ef4444'; 
+            ctx.fill();
+            
+            ctx.fillStyle = '#e5e7eb';
+            ctx.fillRect(4, 9, 8, 4); 
+            ctx.fillRect(-12, 9, 8, 4);
+        }
+        
+        ctx.restore();
+    }
+}
+
 export class Projectile {
-    // Added 'isHoming' to the constructor
     constructor(x, y, angle, speed, damage, color, isEnemy = false, isPiercing = false, isHoming = false) {
         this.x = x; 
         this.y = y; 
@@ -53,13 +138,11 @@ export class Projectile {
         this.isHoming = isHoming; 
     }
     
-    // Updated to accept enemies array for tracking targets
     update(dt, enemies = []) {
         if (this.isHoming && enemies.length > 0) {
             let target = null;
-            let minDist = 600; // Tracking range
+            let minDist = 600; 
             
-            // Find closest enemy
             for (let e of enemies) {
                 if (e.markedForDeletion) continue;
                 let d = MathUtils.distance(this.x, this.y, e.x, e.y);
@@ -69,22 +152,19 @@ export class Projectile {
                 }
             }
             
-            // Steer towards the target
             if (target) {
                 const targetAngle = MathUtils.angle(this.x, this.y, target.x, target.y);
                 const currentAngle = Math.atan2(this.vy, this.vx);
-                
-                // Calculate the shortest rotation path
                 let diff = targetAngle - currentAngle;
+                
                 while (diff < -Math.PI) diff += Math.PI * 2;
                 while (diff > Math.PI) diff -= Math.PI * 2;
                 
                 const turnRate = 5 * dt; 
                 const newAngle = currentAngle + Math.sign(diff) * Math.min(Math.abs(diff), turnRate);
-                
                 const speed = Math.min(CONFIG.PROJECTILE_SPEED * 1.5, Math.sqrt(this.vx * this.vx + this.vy * this.vy) + (10 * dt)); 
                 
-                this.vx = Math.cos(newAngle) * speed;
+                this.vx = Math.cos(newAngle) * speed; 
                 this.vy = Math.sin(newAngle) * speed;
             }
         }
@@ -97,6 +177,7 @@ export class Projectile {
         ctx.save(); 
         ctx.translate(this.x, this.y); 
         ctx.rotate(Math.atan2(this.vy, this.vx));
+        
         ctx.shadowBlur = 15; 
         ctx.shadowColor = this.color; 
         ctx.fillStyle = '#fff';
@@ -105,8 +186,10 @@ export class Projectile {
             ctx.beginPath(); 
             ctx.arc(0, 0, this.radius + 2, 0, Math.PI * 2); 
             ctx.fill();
+            
             ctx.fillStyle = this.color; 
             ctx.globalAlpha = 0.6;
+            
             ctx.beginPath(); 
             ctx.arc(0, 0, this.radius + 6, 0, Math.PI * 2); 
             ctx.fill();
@@ -114,12 +197,19 @@ export class Projectile {
             ctx.beginPath(); 
             ctx.roundRect(-8, -3, 16, 6, 2); 
             ctx.fill();
+            
             ctx.fillStyle = this.color; 
             ctx.globalAlpha = 0.8;
+            
             ctx.beginPath(); 
-            ctx.moveTo(-8, -5); ctx.lineTo(-2, 0); ctx.lineTo(-8, 5); ctx.fill();
-            ctx.fillStyle = '#ef4444';
+            ctx.moveTo(-8, -5); 
+            ctx.lineTo(-2, 0); 
+            ctx.lineTo(-8, 5); 
+            ctx.fill();
+            
+            ctx.fillStyle = '#ef4444'; 
             ctx.globalAlpha = 1;
+            
             ctx.beginPath(); 
             ctx.arc(-10, 0, 2 + Math.random() * 2, 0, Math.PI * 2); 
             ctx.fill();
@@ -127,19 +217,22 @@ export class Projectile {
             ctx.beginPath(); 
             ctx.roundRect(-8, -2, 16, 4, 2); 
             ctx.fill();
+            
             ctx.fillStyle = this.color; 
             ctx.globalAlpha = 0.6;
+            
             ctx.beginPath(); 
             ctx.roundRect(-10, -4, 20, 8, 4); 
             ctx.fill();
             
             if (this.isPiercing) { 
-                ctx.fillStyle = '#fff';
+                ctx.fillStyle = '#fff'; 
                 ctx.beginPath(); 
                 ctx.roundRect(-4, -1, 24, 2, 1); 
-                ctx.fill();
+                ctx.fill(); 
             }
         }
+        
         ctx.restore();
     }
 }
@@ -161,10 +254,11 @@ export class Player {
         };
         this.lastShotTime = 0;
         
-        this.invulnerableTimer = 0;
-        this.abilityTimer = 0;
+        this.invulnerableTimer = 0; 
+        this.hasShieldPowerup = false; // Controls the visual orbit
+        this.abilityTimer = 0; 
         this.isGhost = false; 
-        this.isWingSweepActive = false;
+        this.isWingSweepActive = false; 
         this.activeAbilityTime = 0;
         
         this.skinId = skinId;
@@ -173,7 +267,6 @@ export class Player {
     }
     
     update(targetX, targetY, dt, isShooting = false) {
-        // FIX: Replaced "|| this.isWingSweepActive" so plane stops properly when shooting!
         if (!isShooting) {
             let speedMod = this.isWingSweepActive ? 0.7 : 1;
             this.x = MathUtils.lerp(this.x, targetX, (CONFIG.PLAYER_SPEED * speedMod) * this.stats.speedScale * (dt * 60));
@@ -182,26 +275,60 @@ export class Player {
         
         this.angle = MathUtils.angle(this.x, this.y, targetX, targetY);
         
-        if (this.invulnerableTimer > 0) this.invulnerableTimer -= dt * 1000;
-        if (this.abilityTimer > 0) this.abilityTimer -= dt * 1000;
+        if (this.invulnerableTimer > 0) {
+            this.invulnerableTimer -= dt * 1000;
+        } else {
+            this.hasShieldPowerup = false; // Turn off visual when timer ends
+        }
+        
+        if (this.abilityTimer > 0) {
+            this.abilityTimer -= dt * 1000;
+        }
         
         if (this.activeAbilityTime > 0) {
-            this.activeAbilityTime -= dt * 1000;
-        } else {
-            this.isGhost = false;
-            this.isWingSweepActive = false;
+            this.activeAbilityTime -= dt * 1000; 
+        } else { 
+            this.isGhost = false; 
+            this.isWingSweepActive = false; 
         }
     }
     
     draw(ctx) {
+        // Draw the shield orb only if we have the specific powerup active
+        if (this.hasShieldPowerup) {
+            ctx.save();
+            ctx.translate(this.x, this.y);
+            ctx.rotate(Date.now() * 0.005); 
+            ctx.scale(1.8, 1.8); 
+            
+            ctx.shadowBlur = 30; 
+            ctx.shadowColor = '#0ea5e9';
+            
+            ctx.beginPath();
+            for(let i=0; i<8; i++) {
+                ctx.lineTo(20 * Math.cos(i * Math.PI / 4), 20 * Math.sin(i * Math.PI / 4)); 
+            }
+            ctx.closePath();
+            
+            ctx.fillStyle = 'rgba(14, 165, 233, 0.1)'; 
+            ctx.fill();
+            
+            ctx.lineWidth = 1; 
+            ctx.strokeStyle = 'rgba(14, 165, 233, 0.5)'; 
+            ctx.stroke();
+            
+            ctx.restore();
+        }
+
         ctx.save(); 
         ctx.translate(this.x, this.y); 
         ctx.rotate(this.angle);
         
-        if (this.isGhost) {
-            ctx.globalAlpha = 0.2;
-        } else if (this.invulnerableTimer > 0) {
-            ctx.globalAlpha = Math.floor(Date.now() / 100) % 2 === 0 ? 0.3 : 0.9;
+        // Blink logic for generic invulnerability level ups 
+        if (this.isGhost) { 
+            ctx.globalAlpha = 0.2; 
+        } else if (this.invulnerableTimer > 0) { 
+            ctx.globalAlpha = Math.floor(Date.now() / 100) % 2 === 0 ? 0.3 : 0.9; 
         }
         
         ctx.shadowBlur = 20; 
@@ -217,32 +344,106 @@ export class Player {
                 ctx.lineTo(-15, -18); 
                 break;
             case 1: 
-                ctx.moveTo(36, 0); ctx.lineTo(14, -3); ctx.lineTo(6, -6); ctx.lineTo(-4, -16); 
-                ctx.lineTo(-16, -30); ctx.lineTo(-22, -26); ctx.lineTo(-28, -6); ctx.lineTo(-28, -3); ctx.lineTo(-36, 0);
-                ctx.lineTo(-28, 3); ctx.lineTo(-28, 6); ctx.lineTo(-22, 26); ctx.lineTo(-16, 30); ctx.lineTo(-4, 16); ctx.lineTo(6, 6); ctx.lineTo(14, 3);
+                ctx.moveTo(36, 0); 
+                ctx.lineTo(14, -3); 
+                ctx.lineTo(6, -6); 
+                ctx.lineTo(-4, -16); 
+                ctx.lineTo(-16, -30); 
+                ctx.lineTo(-22, -26); 
+                ctx.lineTo(-28, -6); 
+                ctx.lineTo(-28, -3); 
+                ctx.lineTo(-36, 0); 
+                ctx.lineTo(-28, 3); 
+                ctx.lineTo(-28, 6); 
+                ctx.lineTo(-22, 26); 
+                ctx.lineTo(-16, 30); 
+                ctx.lineTo(-4, 16); 
+                ctx.lineTo(6, 6); 
+                ctx.lineTo(14, 3); 
                 break;
             case 2: 
-                if (this.isWingSweepActive) {
-                    ctx.moveTo(30, 0); ctx.lineTo(12, 4); ctx.lineTo(2, 6); ctx.lineTo(-20, 15); ctx.lineTo(-24, 13); 
-                    ctx.lineTo(-16, 8); ctx.lineTo(-22, 16); ctx.lineTo(-28, 14); ctx.lineTo(-26, 6); ctx.lineTo(-24, 0);
-                    ctx.lineTo(-26, -6); ctx.lineTo(-28, -14); ctx.lineTo(-22, -16); ctx.lineTo(-16, -8); 
-                    ctx.lineTo(-24, -13); ctx.lineTo(-20, -15); ctx.lineTo(2, -6); ctx.lineTo(12, -4);
-                } else {
-                    ctx.moveTo(30, 0); ctx.lineTo(12, 4); ctx.lineTo(2, 8); ctx.lineTo(-18, 28); ctx.lineTo(-24, 26); 
-                    ctx.lineTo(-16, 10); ctx.lineTo(-22, 16); ctx.lineTo(-28, 14); ctx.lineTo(-26, 6); ctx.lineTo(-24, 0); 
-                    ctx.lineTo(-26, -6); ctx.lineTo(-28, -14); ctx.lineTo(-22, -16); ctx.lineTo(-16, -10); ctx.lineTo(-24, -26); ctx.lineTo(-18, -28); ctx.lineTo(2, -8); ctx.lineTo(12, -4);
-                }
+                if (this.isWingSweepActive) { 
+                    ctx.moveTo(30, 0); 
+                    ctx.lineTo(12, 4); 
+                    ctx.lineTo(2, 6); 
+                    ctx.lineTo(-20, 15); 
+                    ctx.lineTo(-24, 13); 
+                    ctx.lineTo(-16, 8); 
+                    ctx.lineTo(-22, 16); 
+                    ctx.lineTo(-28, 14); 
+                    ctx.lineTo(-26, 6); 
+                    ctx.lineTo(-24, 0); 
+                    ctx.lineTo(-26, -6); 
+                    ctx.lineTo(-28, -14); 
+                    ctx.lineTo(-22, -16); 
+                    ctx.lineTo(-16, -8); 
+                    ctx.lineTo(-24, -13); 
+                    ctx.lineTo(-20, -15); 
+                    ctx.lineTo(2, -6); 
+                    ctx.lineTo(12, -4); 
+                } else { 
+                    ctx.moveTo(30, 0); 
+                    ctx.lineTo(12, 4); 
+                    ctx.lineTo(2, 8); 
+                    ctx.lineTo(-18, 28); 
+                    ctx.lineTo(-24, 26); 
+                    ctx.lineTo(-16, 10); 
+                    ctx.lineTo(-22, 16); 
+                    ctx.lineTo(-28, 14); 
+                    ctx.lineTo(-26, 6); 
+                    ctx.lineTo(-24, 0); 
+                    ctx.lineTo(-26, -6); 
+                    ctx.lineTo(-28, -14); 
+                    ctx.lineTo(-22, -16); 
+                    ctx.lineTo(-16, -10); 
+                    ctx.lineTo(-24, -26); 
+                    ctx.lineTo(-18, -28); 
+                    ctx.lineTo(2, -8); 
+                    ctx.lineTo(12, -4); 
+                } 
                 break;
             case 3: 
-                ctx.moveTo(28, 0); ctx.lineTo(16, 2); ctx.lineTo(8, 6); ctx.lineTo(0, 6); ctx.lineTo(-8, 24); ctx.lineTo(-16, 24); ctx.lineTo(-16, 8); ctx.lineTo(-24, 12); 
-                ctx.lineTo(-28, 12); ctx.lineTo(-26, 6); ctx.lineTo(-24, 0); ctx.lineTo(-26, -6); ctx.lineTo(-28, -12); ctx.lineTo(-24, -12); ctx.lineTo(-16, -8); 
-                ctx.lineTo(-16, -24); ctx.lineTo(-8, -24); ctx.lineTo(0, -6); ctx.lineTo(8, -6); ctx.lineTo(16, -2);
+                ctx.moveTo(28, 0); 
+                ctx.lineTo(16, 2); 
+                ctx.lineTo(8, 6); 
+                ctx.lineTo(0, 6); 
+                ctx.lineTo(-8, 24); 
+                ctx.lineTo(-16, 24); 
+                ctx.lineTo(-16, 8); 
+                ctx.lineTo(-24, 12); 
+                ctx.lineTo(-28, 12); 
+                ctx.lineTo(-26, 6); 
+                ctx.lineTo(-24, 0); 
+                ctx.lineTo(-26, -6); 
+                ctx.lineTo(-28, -12); 
+                ctx.lineTo(-24, -12); 
+                ctx.lineTo(-16, -8); 
+                ctx.lineTo(-16, -24); 
+                ctx.lineTo(-8, -24); 
+                ctx.lineTo(0, -6); 
+                ctx.lineTo(8, -6); 
+                ctx.lineTo(16, -2); 
                 break;
             case 4: 
-                ctx.moveTo(30, 0); ctx.lineTo(8, 3); ctx.lineTo(2, 7); ctx.lineTo(-4, 9); ctx.lineTo(-14, 24); ctx.lineTo(-24, 24); ctx.lineTo(-28, 9); ctx.lineTo(-24, 6); 
-                ctx.lineTo(-30, 0); ctx.lineTo(-24, -6); ctx.lineTo(-28, -9); ctx.lineTo(-24, -24); ctx.lineTo(-14, -24); ctx.lineTo(-4, -9); ctx.lineTo(2, -7); ctx.lineTo(8, -3);
+                ctx.moveTo(30, 0); 
+                ctx.lineTo(8, 3); 
+                ctx.lineTo(2, 7); 
+                ctx.lineTo(-4, 9); 
+                ctx.lineTo(-14, 24); 
+                ctx.lineTo(-24, 24); 
+                ctx.lineTo(-28, 9); 
+                ctx.lineTo(-24, 6); 
+                ctx.lineTo(-30, 0); 
+                ctx.lineTo(-24, -6); 
+                ctx.lineTo(-28, -9); 
+                ctx.lineTo(-24, -24); 
+                ctx.lineTo(-14, -24); 
+                ctx.lineTo(-4, -9); 
+                ctx.lineTo(2, -7); 
+                ctx.lineTo(8, -3); 
                 break;
         }
+        
         ctx.closePath(); 
         ctx.fill();
         
@@ -258,132 +459,224 @@ export class Player {
 
 export class Enemy {
     constructor(x, y, type = 'basic', spawnTime = 0) {
-        this.x = x; this.y = y; this.type = type;
-        this.markedForDeletion = false; this.hitFlashTimer = 0;
+        this.x = x; 
+        this.y = y; 
+        this.type = type;
+        this.markedForDeletion = false; 
+        this.hitFlashTimer = 0;
         this.lastShotTime = spawnTime + Math.random() * 2000; 
-        this.fireRate = 3500; this.isCharging = false; this.chargeProgress = 0; this.chargeStartTime = 0;
-
+        this.fireRate = 3500; 
+        this.isCharging = false; 
+        this.chargeProgress = 0; 
+        this.chargeStartTime = 0;
+        
         switch(type) {
-            case 'fast': this.radius = 10; this.speed = 3.2; this.health = 15; this.color = '#f97316'; this.xpValue = 5; break;
-            case 'shield': this.radius = 16; this.speed = 1.0; this.health = 60; this.color = '#2dd4bf'; this.xpValue = 40; break;
-            case 'heavy': this.radius = 20; this.speed = 0.5; this.health = 80; this.color = '#8b5cf6'; this.xpValue = 25; break;
-            case 'elite': this.radius = 16; this.speed = 1.6; this.health = 120; this.color = '#eab308'; this.xpValue = 60; break;
-            case 'shooter': this.radius = 16; this.speed = 0.7; this.health = 40; this.color = '#3b82f6'; this.xpValue = 20; break;
-            default: this.radius = 12; this.speed = 1.2; this.health = 30; this.color = '#a3e635'; this.xpValue = 5;
+            case 'fast': 
+                this.radius = 10; this.speed = 3.2; this.health = 15; this.color = '#f97316'; this.xpValue = 5; 
+                break;
+            case 'shield': 
+                this.radius = 16; this.speed = 1.0; this.health = 60; this.color = '#2dd4bf'; this.xpValue = 40; 
+                break;
+            case 'heavy': 
+                this.radius = 20; this.speed = 0.5; this.health = 80; this.color = '#8b5cf6'; this.xpValue = 25; 
+                break;
+            case 'elite': 
+                this.radius = 16; this.speed = 1.6; this.health = 120; this.color = '#eab308'; this.xpValue = 60; 
+                break;
+            case 'shooter': 
+                this.radius = 16; this.speed = 0.7; this.health = 40; this.color = '#3b82f6'; this.xpValue = 20; 
+                break;
+            default: 
+                this.radius = 12; this.speed = 1.2; this.health = 30; this.color = '#a3e635'; this.xpValue = 5;
         }
         this.maxHealth = this.health;
     }
-
-    takeDamage(amount) {
+    
+    takeDamage(amount) { 
         this.health -= amount; 
         this.hitFlashTimer = 5; 
-        if (this.health <= 0) this.markedForDeletion = true;
+        if (this.health <= 0) {
+            this.markedForDeletion = true; 
+        }
     }
-
+    
     update(playerX, playerY, dt, allEnemies, isPlayerGhost) {
-        if (this.hitFlashTimer > 0) this.hitFlashTimer--;
-
+        if (this.hitFlashTimer > 0) {
+            this.hitFlashTimer--;
+        }
+        
         let tX = isPlayerGhost ? this.x + (this.vx || 1) * 100 : playerX;
         let tY = isPlayerGhost ? this.y + (this.vy || 1) * 100 : playerY;
-
+        
         if (this.type === 'shield') {
             let target = null; 
             let bestWeight = -1;
             
             for (let e of allEnemies) {
-                if (e === this || e.type === 'shield' || e.markedForDeletion) continue;
+                if (e === this || e.type === 'shield' || e.markedForDeletion) {
+                    continue;
+                }
+                
                 const dist = MathUtils.distance(this.x, this.y, e.x, e.y);
                 let typeMultiplier = e.type === 'elite' ? 3 : (e.type === 'shooter' ? 2 : (e.type === 'heavy' ? 1.5 : 1));
                 let score = (1000 / (dist + 1)) * typeMultiplier;
-                if (score > bestWeight) { bestWeight = score; target = e; }
+                
+                if (score > bestWeight) { 
+                    bestWeight = score; 
+                    target = e; 
+                }
             }
-
+            
             if (target) {
                 if (MathUtils.distance(this.x, this.y, target.x, target.y) > 40) { 
                     const angle = MathUtils.angle(this.x, this.y, target.x, target.y);
-                    this.x += Math.cos(angle) * this.speed * (dt * 60); this.y += Math.sin(angle) * this.speed * (dt * 60);
-                } else {
-                    this.x += Math.cos(Date.now() * 0.001) * 0.2; this.y += Math.sin(Date.now() * 0.001) * 0.2;
+                    this.x += Math.cos(angle) * this.speed * (dt * 60); 
+                    this.y += Math.sin(angle) * this.speed * (dt * 60);
+                } else { 
+                    this.x += Math.cos(Date.now() * 0.001) * 0.2; 
+                    this.y += Math.sin(Date.now() * 0.001) * 0.2; 
                 }
-            } else if (!isPlayerGhost) {
-                const angle = MathUtils.angle(this.x, this.y, tX, tY);
-                this.x -= Math.cos(angle) * (this.speed * 0.5) * (dt * 60); this.y -= Math.sin(angle) * (this.speed * 0.5) * (dt * 60);
+            } else if (!isPlayerGhost) { 
+                const angle = MathUtils.angle(this.x, this.y, tX, tY); 
+                this.x -= Math.cos(angle) * (this.speed * 0.5) * (dt * 60); 
+                this.y -= Math.sin(angle) * (this.speed * 0.5) * (dt * 60); 
             }
         } else {
             let moveSpeed = (this.type === 'shooter' && this.isCharging) ? this.speed * 0.2 : this.speed;
             const angle = MathUtils.angle(this.x, this.y, tX, tY);
             
-            this.x += Math.cos(angle) * moveSpeed * (dt * 60);
+            this.x += Math.cos(angle) * moveSpeed * (dt * 60); 
             this.y += Math.sin(angle) * moveSpeed * (dt * 60);
             
             this.vx = Math.cos(angle); 
             this.vy = Math.sin(angle); 
         }
     }
-
+    
     draw(ctx) {
-        ctx.save(); ctx.translate(this.x, this.y);
+        ctx.save(); 
+        ctx.translate(this.x, this.y);
         
         if (this.type === 'shield') {
-            ctx.beginPath(); ctx.arc(0, 0, 60, 0, Math.PI * 2);
-            ctx.fillStyle = 'rgba(45, 212, 191, 0.08)'; ctx.fill();
-            ctx.strokeStyle = 'rgba(45, 212, 191, 0.4)'; ctx.lineWidth = 1; ctx.stroke();
+            ctx.beginPath(); 
+            ctx.arc(0, 0, 60, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(45, 212, 191, 0.08)'; 
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(45, 212, 191, 0.4)'; 
+            ctx.lineWidth = 1; 
+            ctx.stroke();
         }
-
+        
         const angle = MathUtils.angle(0, 0, this.vx || 1, this.vy || 1);
-        ctx.rotate(angle); ctx.shadowBlur = 15; ctx.shadowColor = this.color;
+        ctx.rotate(angle); 
+        ctx.shadowBlur = 15; 
+        ctx.shadowColor = this.color;
         ctx.fillStyle = this.hitFlashTimer > 0 ? '#ffffff' : this.color;
         
         ctx.beginPath();
-        if (this.type === 'heavy') ctx.rect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
-        else if (this.type === 'shield') { for(let i=0; i<8; i++) ctx.lineTo(this.radius * Math.cos(i * Math.PI / 4), this.radius * Math.sin(i * Math.PI / 4)); ctx.closePath(); }
-        else if (this.type === 'elite') { for(let i=0; i<6; i++) ctx.lineTo(this.radius * Math.cos(i * Math.PI / 3), this.radius * Math.sin(i * Math.PI / 3)); ctx.closePath(); }
-        else if (this.type === 'shooter') {
-            ctx.moveTo(0, -this.radius - 4); ctx.lineTo(this.radius + 4, 0); ctx.lineTo(0, this.radius + 4); ctx.lineTo(-this.radius - 4, 0); ctx.closePath();
-            if (this.isCharging) {
-                ctx.beginPath(); ctx.arc(0, 0, this.radius + 10 + Math.sin(Date.now() * 0.015) * 4, 0, Math.PI * 2);
-                ctx.strokeStyle = `rgba(239, 68, 68, ${this.chargeProgress})`; ctx.lineWidth = 3; ctx.stroke();
+        if (this.type === 'heavy') {
+            ctx.rect(-this.radius, -this.radius, this.radius * 2, this.radius * 2);
+        } else if (this.type === 'shield') { 
+            for(let i=0; i<8; i++) {
+                ctx.lineTo(this.radius * Math.cos(i * Math.PI / 4), this.radius * Math.sin(i * Math.PI / 4)); 
             }
-        } 
-        else if (this.type === 'fast') { ctx.moveTo(this.radius + 4, 0); ctx.lineTo(-this.radius, this.radius - 2); ctx.lineTo(-this.radius, -this.radius + 2); ctx.closePath(); }
-        else ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+            ctx.closePath(); 
+        } else if (this.type === 'elite') { 
+            for(let i=0; i<6; i++) {
+                ctx.lineTo(this.radius * Math.cos(i * Math.PI / 3), this.radius * Math.sin(i * Math.PI / 3)); 
+            }
+            ctx.closePath(); 
+        } else if (this.type === 'shooter') {
+            ctx.moveTo(0, -this.radius - 4); 
+            ctx.lineTo(this.radius + 4, 0); 
+            ctx.lineTo(0, this.radius + 4); 
+            ctx.lineTo(-this.radius - 4, 0); 
+            ctx.closePath();
+            
+            if (this.isCharging) { 
+                ctx.beginPath(); 
+                ctx.arc(0, 0, this.radius + 10 + Math.sin(Date.now() * 0.015) * 4, 0, Math.PI * 2); 
+                ctx.strokeStyle = `rgba(239, 68, 68, ${this.chargeProgress})`; 
+                ctx.lineWidth = 3; 
+                ctx.stroke(); 
+            }
+        } else if (this.type === 'fast') { 
+            ctx.moveTo(this.radius + 4, 0); 
+            ctx.lineTo(-this.radius, this.radius - 2); 
+            ctx.lineTo(-this.radius, -this.radius + 2); 
+            ctx.closePath(); 
+        } else {
+            ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        }
         
-        ctx.fill(); ctx.restore();
+        ctx.fill(); 
+        ctx.restore();
     }
 }
 
 export class XPGem {
     constructor(x, y, value) {
-        this.x = x; this.y = y; this.value = value;
+        this.x = x; 
+        this.y = y; 
+        this.value = value;
         this.radius = Math.min(12, 4 + Math.sqrt(value));
-        this.color = CONFIG.COLORS.xp; this.markedForDeletion = false; this.magnetized = false;
+        this.color = CONFIG.COLORS.xp; 
+        this.markedForDeletion = false; 
+        this.magnetized = false;
     }
     
     update(playerX, playerY, dt) {
         if (MathUtils.distance(this.x, this.y, playerX, playerY) < 100 || this.magnetized) {
             this.magnetized = true;
             const angle = MathUtils.angle(this.x, this.y, playerX, playerY);
-            this.x += Math.cos(angle) * 8 * (dt * 60); this.y += Math.sin(angle) * 8 * (dt * 60);
+            this.x += Math.cos(angle) * 15 * (dt * 60); 
+            this.y += Math.sin(angle) * 15 * (dt * 60);
         }
     }
     
     draw(ctx) {
-        ctx.save(); ctx.shadowBlur = 10; ctx.shadowColor = this.color; ctx.fillStyle = this.color;
-        ctx.beginPath(); ctx.moveTo(this.x, this.y - this.radius); ctx.lineTo(this.x + this.radius, this.y); ctx.lineTo(this.x, this.y + this.radius); ctx.lineTo(this.x - this.radius, this.y); ctx.closePath(); ctx.fill(); 
+        ctx.save(); 
+        ctx.shadowBlur = 10; 
+        ctx.shadowColor = this.color; 
+        ctx.fillStyle = this.color;
+        
+        ctx.beginPath(); 
+        ctx.moveTo(this.x, this.y - this.radius); 
+        ctx.lineTo(this.x + this.radius, this.y); 
+        ctx.lineTo(this.x, this.y + this.radius); 
+        ctx.lineTo(this.x - this.radius, this.y); 
+        ctx.closePath(); 
+        ctx.fill(); 
+        
         ctx.restore();
     }
 }
 
 export class FloatingText {
     constructor(x, y, text, color = '#ffffff', isCrit = false) {
-        this.x = x; this.y = y; this.text = text; this.color = color;
-        this.alpha = 1; this.vy = -1; this.isCrit = isCrit;
+        this.x = x; 
+        this.y = y; 
+        this.text = text; 
+        this.color = color;
+        this.alpha = 1; 
+        this.vy = -1; 
+        this.isCrit = isCrit;
     }
     
-    update(dt) { this.y += this.vy * (dt * 60); this.alpha -= 0.02 * (dt * 60); }
+    update(dt) { 
+        this.y += this.vy * (dt * 60); 
+        this.alpha -= 0.02 * (dt * 60); 
+    }
     
     draw(ctx) {
-        ctx.save(); ctx.globalAlpha = Math.max(0, this.alpha); ctx.font = this.isCrit ? 'bold 22px Rajdhani' : 'bold 16px Rajdhani';
-        ctx.fillStyle = this.color; ctx.shadowBlur = 4; ctx.shadowColor = '#000'; ctx.textAlign = 'center'; ctx.fillText(this.text, this.x, this.y); ctx.restore();
+        ctx.save(); 
+        ctx.globalAlpha = Math.max(0, this.alpha); 
+        ctx.font = this.isCrit ? 'bold 22px Rajdhani' : 'bold 16px Rajdhani';
+        ctx.fillStyle = this.color; 
+        ctx.shadowBlur = 4; 
+        ctx.shadowColor = '#000'; 
+        ctx.textAlign = 'center'; 
+        ctx.fillText(this.text, this.x, this.y); 
+        ctx.restore();
     }
 }

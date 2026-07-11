@@ -1,148 +1,118 @@
 export class EnemySpawner {
-    constructor(canvasWidth, canvasHeight) {
-        this.width = canvasWidth;
-        this.height = canvasHeight;
-        this.spawnTimer = 0;
+    constructor(canvasWidth, canvasHeight) { 
+        this.width = canvasWidth; 
+        this.height = canvasHeight; 
+        this.spawnTimer = 0; 
     }
-
+    
     update(dt, survivalTimeMS, game) {
         this.spawnTimer += dt * 1000;
-
+        
         const pulseRate = survivalTimeMS > 180000 ? 1800 : 2500;
         const squadSize = survivalTimeMS > 180000 ? 4 : 3;
-
-        if (this.spawnTimer > pulseRate) {
-            this.spawnTimer = 0;
+        
+        if (this.spawnTimer > pulseRate) { 
+            this.spawnTimer = 0; 
             for(let i = 0; i < squadSize; i++) {
-                this.spawnEnemy(game, survivalTimeMS);
+                this.spawnEnemy(game, survivalTimeMS); 
             }
         }
     }
-
+    
     spawnEnemy(game, timeMS) {
         let x, y;
         
-        if (Math.random() < 0.5) {
-            x = Math.random() < 0.5 ? -30 : this.width + 30;
-            y = Math.random() * this.height;
-        } else {
-            x = Math.random() * this.width;
-            y = Math.random() < 0.5 ? -30 : this.height + 30;
+        if (Math.random() < 0.5) { 
+            x = Math.random() < 0.5 ? -30 : this.width + 30; 
+            y = Math.random() * this.height; 
+        } else { 
+            x = Math.random() * this.width; 
+            y = Math.random() < 0.5 ? -30 : this.height + 30; 
         }
-
-        let type = 'basic';
-        const rand = Math.random();
         
+        let type = 'basic'; 
+        const rand = Math.random();
         const activeShooters = game.enemies.filter(e => e.type === 'shooter').length;
         const activeShields = game.enemies.filter(e => e.type === 'shield').length;
-
-        if (timeMS < 120000) {
+        
+        if (timeMS < 120000) { 
             if (rand < 0.20) {
-                type = 'fast';
+                type = 'fast'; 
             } else if (rand < 0.30 && timeMS > 60000) {
                 type = 'heavy'; 
             } else {
-                type = 'basic';
+                type = 'basic'; 
             }
-        } 
-        else if (timeMS < 240000) {
+        } else if (timeMS < 240000) { 
             if (rand < 0.15 && activeShooters < 3) {
                 type = 'shooter'; 
             } else if (rand < 0.35 && activeShields < 5) {
-                type = 'shield';
+                type = 'shield'; 
             } else if (rand < 0.55) {
-                type = 'heavy';
+                type = 'heavy'; 
             } else if (rand < 0.75) {
-                type = 'fast';
+                type = 'fast'; 
             } else {
-                type = 'basic';
+                type = 'basic'; 
             }
-        } 
-        else {
+        } else { 
             if (rand < 0.20) {
-                type = 'elite';
+                type = 'elite'; 
             } else if (rand < 0.40 && activeShooters < 5) {
                 type = 'shooter'; 
             } else if (rand < 0.60 && activeShields < 5) {
-                type = 'shield';
+                type = 'shield'; 
             } else if (rand < 0.80) {
-                type = 'heavy';
+                type = 'heavy'; 
             } else {
                 type = 'fast'; 
             }
         }
-
+        
         game.enemies.push(new game.Enemy(x, y, type, timeMS));
     }
 }
 
 export class UpgradeManager {
-    constructor() {
+    constructor() { 
         this.availableUpgrades = [
-            { 
-                id: 'multishot', 
-                title: 'Twin Link', 
-                desc: 'Fires an additional projectile.', 
-                color: 'text-yellow-400' 
-            },
-            { 
-                id: 'firerate', 
-                title: 'Overclock', 
-                desc: 'Increases firing speed by 20%.', 
-                color: 'text-cyan-400' 
-            },
-            { 
-                id: 'damage', 
-                title: 'Plasma Core', 
-                desc: 'Increases base damage by 25%.', 
-                color: 'text-red-400' 
-            },
-            { 
-                id: 'crit', 
-                title: 'Targeting Matrix', 
-                desc: '+15% chance to deal DOUBLE damage.', 
-                color: 'text-purple-400' 
-            },
-            { 
-                id: 'heal', 
-                title: 'Nano-Repair', 
-                desc: 'Restores 50% Integrity.', 
-                color: 'text-green-400' 
-            }
-        ];
+            { id: 'multishot', title: 'Twin Link', desc: 'Fires an additional projectile.', color: 'text-yellow-400' },
+            { id: 'firerate', title: 'Overclock', desc: 'Increases firing speed by 20%.', color: 'text-cyan-400' },
+            { id: 'damage', title: 'Plasma Core', desc: 'Increases base damage by 25%.', color: 'text-red-400' },
+            { id: 'crit', title: 'Targeting Matrix', desc: '+15% chance to deal DOUBLE damage.', color: 'text-purple-400' },
+            { id: 'heal', title: 'Nano-Repair', desc: 'Restores 50% Integrity.', color: 'text-green-400' }
+        ]; 
     }
-
-    getUpgrades(gameMode) {
-        let pool = this.availableUpgrades;
+    
+    getUpgrades(gameMode) { 
+        let pool = this.availableUpgrades; 
         
-        // Remove healing upgrade if in hardcore mode
         if (gameMode === 'hardcore') {
-            pool = pool.filter(u => u.id !== 'heal');
+            pool = pool.filter(u => u.id !== 'heal'); 
         }
         
-        // Shuffle array and return first 3
-        const shuffled = [...pool].sort(() => 0.5 - Math.random());
-        return shuffled.slice(0, 3);
+        const shuffled = [...pool].sort(() => 0.5 - Math.random()); 
+        return shuffled.slice(0, 3); 
     }
-
-    applyUpgrade(id, player) {
-        switch(id) {
+    
+    applyUpgrade(id, player) { 
+        switch(id) { 
             case 'multishot': 
                 player.stats.multiShot += 1; 
-                break;
+                break; 
             case 'firerate': 
                 player.stats.fireRate *= 0.80; 
-                break;
+                break; 
             case 'damage': 
                 player.stats.damage *= 1.25; 
-                break;
+                break; 
             case 'crit': 
                 player.stats.critChance += 0.15; 
-                break;
-            case 'heal':
-                player.health = Math.min(player.maxHealth, player.health + (player.maxHealth * 0.5));
-                document.getElementById('healthBar').style.width = `${(player.health / player.maxHealth) * 100}%`;
-                break;
-        }
+                break; 
+            case 'heal': 
+                player.health = Math.min(player.maxHealth, player.health + (player.maxHealth * 0.5)); 
+                document.getElementById('healthBar').style.width = `${(player.health / player.maxHealth) * 100}%`; 
+                break; 
+        } 
     }
 }
